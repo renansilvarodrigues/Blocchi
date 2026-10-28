@@ -1,6 +1,6 @@
 # 🧱 Blocchi - Lego 3D Studio
 
-Uma aplicação web moderna de montagem de blocos de Lego com estética profissional inspirada no **Blender**, desenvolvida em **React**, **Three.js** e **Tailwind CSS**, com integração ao padrão oficial **LDraw**.
+Uma aplicação web moderna de montagem de blocos de Lego, desenvolvida em **React**, **Three.js** e **Tailwind CSS**, com integração ao padrão oficial **LDraw**.
 
 ![Blocchi Studio Preview](https://images.unsplash.com/photo-1585366119957-e9730b6d0f60?auto=format&fit=crop&w=1200&q=80)
 
@@ -8,7 +8,7 @@ Uma aplicação web moderna de montagem de blocos de Lego com estética profissi
 
 ## ✨ Recursos Principais
 
-### 🎨 Interface Inspirada no Blender
+### 🎨 Interface
 - **Tema Dark Charcoal Profissional**: Painéis escuros, tipografia nítida, paleta de ferramentas vertical e abas de workspace (*Montagem*, *Modelagem*, *Cores LDraw*, *Inspetor*).
 - **Gizmo 3D de Orientação**: Indicador circular interativo dos eixos X, Y e Z no canto superior direito com vistas rápidas (*Top*, *Front*, *Right*).
 - **Modos de Shading**: Alternância instantânea entre *Wireframe*, *Sólido (Clay)*, *Material Preview* e *Renderizado*.
