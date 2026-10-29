@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Search, Plus, Box } from 'lucide-react';
 import { LEGO_PARTS_CATALOG } from '../../ldraw/partsData';
 import type { LegoPartDefinition } from '../../types/lego';
@@ -12,41 +12,42 @@ export const PartsCatalog: React.FC<PartsCatalogProps> = ({ onAddPart, activeCol
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
 
-  const categories = ['Todos', 'Bricks', 'Plates', 'Tiles', 'Baseplates'];
+  const categories = ['Todos', 'Bricks', 'Plates', 'Tiles', 'Slopes', 'Rounds', 'Baseplates', 'Technic'];
 
   const filteredParts = LEGO_PARTS_CATALOG.filter((part) => {
     const matchesCategory = selectedCategory === 'Todos' || part.category === selectedCategory;
     const matchesSearch =
       part.name.toLowerCase().includes(search.toLowerCase()) ||
       part.id.toLowerCase().includes(search.toLowerCase()) ||
-      part.category.toLowerCase().includes(search.toLowerCase());
+      part.category.toLowerCase().includes(search.toLowerCase()) ||
+      part.description.toLowerCase().includes(search.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
   return (
     <div className="flex flex-col h-full text-xs">
       {/* Busca */}
-      <div className="p-3 border-b border-[#303038]">
+      <div className="p-3 border-b border-[#303038] space-y-2">
         <div className="relative">
           <Search size={14} className="absolute left-2.5 top-2.5 text-zinc-500" />
           <input
             type="text"
-            placeholder="Buscar peça ou código LDraw (ex: 3001, 2x4)..."
+            placeholder="Buscar peça ou código LDraw (ex: 3001, 2x4, slope)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-[#1b1b20] border border-[#373742] rounded-md pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-amber-500"
           />
         </div>
 
-        {/* Categorias */}
-        <div className="flex gap-1 mt-2.5 overflow-x-auto pb-1 scrollbar-none">
+        {/* Categorias Oficiais */}
+        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none text-[11px]">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-2 py-1 rounded text-[11px] whitespace-nowrap transition-colors font-medium ${
+              className={`px-2 py-1 rounded whitespace-nowrap transition-colors font-medium ${
                 selectedCategory === cat
-                  ? 'bg-amber-600 text-white'
+                  ? 'bg-amber-600 text-white shadow-sm'
                   : 'bg-[#1e1e24] text-zinc-400 hover:text-zinc-200 hover:bg-[#2b2b35]'
               }`}
             >
@@ -62,13 +63,13 @@ export const PartsCatalog: React.FC<PartsCatalogProps> = ({ onAddPart, activeCol
           return (
             <div
               key={part.id}
-              className="bg-[#24242c] hover:bg-[#2c2c36] border border-[#353540] hover:border-amber-500/50 rounded-lg p-2.5 transition-all group flex flex-col gap-2"
+              className="bg-[#24242c] hover:bg-[#2c2c36] border border-[#353540] hover:border-amber-500/50 rounded-lg p-2.5 transition-all group flex flex-col gap-2 shadow-sm"
             >
               <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  {/* Ícone de bloco estilizado com a cor ativa */}
+                <div className="flex items-center gap-2.5">
+                  {/* Prévia da peça com a cor ativa */}
                   <div
-                    className="w-8 h-8 rounded border border-white/20 flex items-center justify-center shadow-inner"
+                    className="w-8 h-8 rounded border border-white/20 flex items-center justify-center shadow-inner shrink-0"
                     style={{ backgroundColor: activeColorHex }}
                   >
                     <Box size={16} className="text-white drop-shadow" />
@@ -89,7 +90,7 @@ export const PartsCatalog: React.FC<PartsCatalogProps> = ({ onAddPart, activeCol
                 <button
                   onClick={() => onAddPart(part)}
                   className="bg-amber-600 hover:bg-amber-500 text-white p-1.5 rounded transition-colors shadow-sm"
-                  title="Inserir na cena"
+                  title="Inserir na mesa"
                 >
                   <Plus size={14} />
                 </button>
@@ -98,7 +99,9 @@ export const PartsCatalog: React.FC<PartsCatalogProps> = ({ onAddPart, activeCol
               {/* Informações LDraw */}
               <div className="bg-[#1a1a20] px-2 py-1 rounded text-[10px] text-zinc-400 font-mono flex items-center justify-between border border-[#2b2b35]">
                 <span>LDU: {part.lduSize.x}×{part.lduSize.y}×{part.lduSize.z}</span>
-                <span className="text-amber-400/90">{part.hasStuds ? 'Com pinos' : 'Liso (Tile)'}</span>
+                <span className="text-amber-400/90 font-sans">
+                  {part.hasStuds ? 'Com pinos' : 'Liso (Tile/Rampa)'}
+                </span>
               </div>
             </div>
           );

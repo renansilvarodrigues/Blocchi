@@ -9,24 +9,34 @@ import type { PlacedBrick, ViewportSettings, ToolMode, LDrawColor, LegoPartDefin
 import { LEGO_PARTS_CATALOG } from './ldraw/partsData';
 import { getLDrawColor } from './ldraw/colors';
 import { exportModelToLDraw, downloadLDrawFile } from './ldraw/exportLDraw';
-import { STUD_SPACING } from './ldraw/proceduralBricks';
+import {
+  STUD_SPACING,
+  PLATE_HEIGHT,
+  calculateLDrawStudSnap,
+  calculateStudAttachment,
+  snapToUnderlyingStuds,
+} from './ldraw/proceduralBricks';
 import { X, Copy, Download, Code } from 'lucide-react';
 
 export function App() {
-  // Peça inicial de teste: Bloco 2x4 LDraw (#3001) Vermelho no centro da mesa
+  // Peça inicial de teste: Bloco 2x4 LDraw (#3001) Vermelho no centro da mesa com snap oficial
   const [bricks, setBricks] = useState<PlacedBrick[]>([
     {
       instanceId: 'brick_init_3001',
       partId: '3001', // Brick 2 x 4
       name: 'Brick 2 x 4',
       colorCode: 4, // Vermelho oficial LDraw
-      position: [0, 0, 0],
+      position: [0, 0, 0], // Exatamente no centro da mesa (0, 0, 0)
       rotation: [0, 0, 0],
     },
   ]);
 
+  // Histórico de Ações (Undo / Redo)
+  const [past, setPast] = useState<PlacedBrick[][]>([]);
+  const [future, setFuture] = useState<PlacedBrick[][]>([]);
+
   const [selectedBrickId, setSelectedBrickId] = useState<string | null>('brick_init_3001');
-  const [activeColorCode, setActiveColorCode] = useState<number>(4); // Vermelho padrão
+  const [activeColorCode, setActiveColorCode] = useState<number>(4);
   const [activeTool, setActiveTool] = useState<ToolMode>('move');
   const [activeSidebarTab, setActiveSidebarTab] = useState<'parts' | 'colors' | 'inspector'>('parts');
   const [activeWorkspace, setActiveWorkspace] = useState<string>('Montagem');
@@ -49,21 +59,79 @@ export function App() {
     studSnapping: true,
   });
 
+  // Função central para cometer alterações no estado com gravação no histórico
+  const commitBricks = useCallback((updater: PlacedBrick[] | ((prev: PlacedBrick[]) => PlacedBrick[])) => {
+    setBricks((current) => {
+      const next = typeof updater === 'function' ? updater(current) : updater;
+      // Salvar estado atual no passado (limite de 50 ações) e limpar futuro
+      setPast((p) => [...p.slice(-49), current]);
+      setFuture([]);
+      return next;
+    });
+  }, []);
+
+  // Desfazer (Undo)
+  const handleUndo = useCallback(() => {
+    setPast((prevPast) => {
+      if (prevPast.length === 0) return prevPast;
+      const previous = prevPast[prevPast.length - 1];
+      const newPast = prevPast.slice(0, -1);
+
+      setBricks((current) => {
+        setFuture((prevFuture) => [current, ...prevFuture]);
+        return previous;
+      });
+
+      setSelectedBrickId((curId) =>
+        curId && previous.some((b) => b.instanceId === curId)
+          ? curId
+          : previous.length > 0
+          ? previous[previous.length - 1].instanceId
+          : null
+      );
+
+      return newPast;
+    });
+  }, []);
+
+  // Refazer (Redo)
+  const handleRedo = useCallback(() => {
+    setFuture((prevFuture) => {
+      if (prevFuture.length === 0) return prevFuture;
+      const next = prevFuture[0];
+      const newFuture = prevFuture.slice(1);
+
+      setBricks((current) => {
+        setPast((prevPast) => [...prevPast, current]);
+        return next;
+      });
+
+      setSelectedBrickId((curId) =>
+        curId && next.some((b) => b.instanceId === curId)
+          ? curId
+          : next.length > 0
+          ? next[next.length - 1].instanceId
+          : null
+      );
+
+      return newFuture;
+    });
+  }, []);
+
   const activeColor = getLDrawColor(activeColorCode);
   const selectedBrick = bricks.find((b) => b.instanceId === selectedBrickId) || null;
 
   // Atualização direta de posição e rotação via TransformControls 3D no Canvas
   const handleUpdateBrickTransform = useCallback(
     (id: string, position: [number, number, number], rotation: [number, number, number]) => {
-      setBricks((prev) =>
+      commitBricks((prev) =>
         prev.map((b) => (b.instanceId === id ? { ...b, position, rotation } : b))
       );
     },
-    []
+    [commitBricks]
   );
 
-  // Inserir nova peça: se houver peça selecionada, conecta em cima dos pinos dela!
-  // Se não houver, posiciona na mesa no próximo ponto livre do grid sem colisão!
+  // Inserir nova peça com snap oficial aos pinos da peça selecionada ou à mesa
   const handleAddPart = useCallback(
     (part: LegoPartDefinition) => {
       const selected = bricks.find((b) => b.instanceId === selectedBrickId);
@@ -71,17 +139,22 @@ export function App() {
       let newRotation: [number, number, number] = [0, 0, 0];
 
       if (selected) {
-        // Conectar diretamente sobre os pinos da peça selecionada
-        const selectedDef = LEGO_PARTS_CATALOG.find((p) => p.id === selected.partId);
-        const selHeight = (selectedDef?.dimensions.heightPlates || 3) * 8 * 0.04; // 0.96 para bloco, 0.32 para placa
-        newPosition = [
-          selected.position[0],
-          selected.position[1] + selHeight,
-          selected.position[2],
-        ];
+        const selectedDef =
+          LEGO_PARTS_CATALOG.find((p) => p.id === selected.partId) || LEGO_PARTS_CATALOG[0];
         newRotation = [...selected.rotation];
+
+        if (viewportSettings.studSnapping) {
+          // Encaixe perfeito e inteligente diretamente nos pinos da peça selecionada
+          newPosition = calculateStudAttachment(selected, selectedDef, part, newRotation[1]);
+        } else {
+          const selHeight = selectedDef.dimensions.heightPlates * PLATE_HEIGHT;
+          newPosition = [
+            selected.position[0],
+            selected.position[1] + selHeight,
+            selected.position[2],
+          ];
+        }
       } else {
-        // Posicionar na mesa sem colidir com peças já existentes
         let targetZ = 0;
         for (const b of bricks) {
           if (b.position[1] < 0.1 && Math.abs(b.position[0]) < 0.5) {
@@ -90,7 +163,11 @@ export function App() {
             targetZ = Math.max(targetZ, b.position[2] + bLen + STUD_SPACING);
           }
         }
-        newPosition = [0, 0, targetZ];
+
+        const rawPos: [number, number, number] = [0, 0, targetZ];
+        newPosition = viewportSettings.studSnapping
+          ? calculateLDrawStudSnap(rawPos, part, 0)
+          : rawPos;
       }
 
       const newBrick: PlacedBrick = {
@@ -102,10 +179,10 @@ export function App() {
         rotation: newRotation,
       };
 
-      setBricks((prev) => [...prev, newBrick]);
+      commitBricks((prev) => [...prev, newBrick]);
       setSelectedBrickId(newBrick.instanceId);
     },
-    [bricks, selectedBrickId, activeColorCode]
+    [bricks, selectedBrickId, activeColorCode, viewportSettings.studSnapping, commitBricks]
   );
 
   // Inserir rapidamente um Bloco 2x4
@@ -114,7 +191,7 @@ export function App() {
     handleAddPart(part2x4);
   }, [handleAddPart]);
 
-  // Encaixar perfeitamente aos pinos inferiores ou mesa (Snap to Studs)
+  // Encaixar rigorosamente aos pinos inferiores ou mesa (Snap to Studs)
   const handleSnapSelectedToStuds = useCallback(() => {
     if (!selectedBrickId) return;
     const current = bricks.find((b) => b.instanceId === selectedBrickId);
@@ -125,7 +202,7 @@ export function App() {
     const curHalfW = (currentDef.dimensions.studsX * STUD_SPACING) / 2;
     const curHalfL = (currentDef.dimensions.studsZ * STUD_SPACING) / 2;
 
-    let highestUnderlyingY = 0; // nível da mesa de montagem
+    let bestUnderlying: { brick: PlacedBrick; def: LegoPartDefinition; topY: number } | null = null;
 
     for (const other of bricks) {
       if (other.instanceId === current.instanceId) continue;
@@ -133,46 +210,45 @@ export function App() {
       if (!otherDef) continue;
       const otherHalfW = (otherDef.dimensions.studsX * STUD_SPACING) / 2;
       const otherHalfL = (otherDef.dimensions.studsZ * STUD_SPACING) / 2;
-      const otherHeight = otherDef.dimensions.heightPlates * 8 * 0.04;
+      const otherHeight = otherDef.dimensions.heightPlates * PLATE_HEIGHT;
+      const topSurface = other.position[1] + otherHeight;
 
-      // Verificar sobreposição horizontal X e Z
       const overlapX =
-        Math.abs(current.position[0] - other.position[0]) < curHalfW + otherHalfW - 0.05;
+        Math.abs(current.position[0] - other.position[0]) < curHalfW + otherHalfW + 0.2;
       const overlapZ =
-        Math.abs(current.position[2] - other.position[2]) < curHalfL + otherHalfL - 0.05;
+        Math.abs(current.position[2] - other.position[2]) < curHalfL + otherHalfL + 0.2;
 
-      if (overlapX && overlapZ) {
-        const topSurface = other.position[1] + otherHeight;
-        // Se a peça de baixo está no mesmo nível ou abaixo
-        if (topSurface <= current.position[1] + 0.5) {
-          highestUnderlyingY = Math.max(highestUnderlyingY, topSurface);
+      if (overlapX && overlapZ && topSurface <= current.position[1] + 0.5) {
+        if (!bestUnderlying || topSurface > bestUnderlying.topY) {
+          bestUnderlying = { brick: other, def: otherDef, topY: topSurface };
         }
       }
     }
 
-    // Alinhar a posição X e Z ao grid exato de studs e assentar Y nos pinos
-    setBricks((prev) =>
-      prev.map((b) => {
-        if (b.instanceId === selectedBrickId) {
-          return {
-            ...b,
-            position: [
-              Math.round(b.position[0] / STUD_SPACING) * STUD_SPACING,
-              highestUnderlyingY,
-              Math.round(b.position[2] / STUD_SPACING) * STUD_SPACING,
-            ],
-          };
-        }
-        return b;
-      })
+    let finalPos: [number, number, number];
+    if (bestUnderlying) {
+      finalPos = snapToUnderlyingStuds(
+        current.position,
+        currentDef,
+        current.rotation[1],
+        bestUnderlying.brick,
+        bestUnderlying.def
+      );
+    } else {
+      finalPos = calculateLDrawStudSnap(current.position, currentDef, current.rotation[1]);
+      finalPos[1] = 0; // Mesa de montagem
+    }
+
+    commitBricks((prev) =>
+      prev.map((b) => (b.instanceId === selectedBrickId ? { ...b, position: finalPos } : b))
     );
-  }, [bricks, selectedBrickId]);
+  }, [bricks, selectedBrickId, commitBricks]);
 
   // Selecionar cor
   const handleSelectColor = (color: LDrawColor) => {
     setActiveColorCode(color.code);
     if (selectedBrickId) {
-      setBricks((prev) =>
+      commitBricks((prev) =>
         prev.map((b) =>
           b.instanceId === selectedBrickId ? { ...b, colorCode: color.code } : b
         )
@@ -183,7 +259,7 @@ export function App() {
   // Girar peça selecionada 90 graus
   const handleRotateSelected = useCallback(() => {
     if (!selectedBrickId) return;
-    setBricks((prev) =>
+    commitBricks((prev) =>
       prev.map((b) => {
         if (b.instanceId === selectedBrickId) {
           const newRotY = (b.rotation[1] + Math.PI / 2) % (Math.PI * 2);
@@ -192,7 +268,7 @@ export function App() {
         return b;
       })
     );
-  }, [selectedBrickId]);
+  }, [selectedBrickId, commitBricks]);
 
   // Duplicar peça selecionada
   const handleDuplicateSelected = useCallback(() => {
@@ -200,46 +276,59 @@ export function App() {
     const current = bricks.find((b) => b.instanceId === selectedBrickId);
     if (!current) return;
 
+    const currentDef = LEGO_PARTS_CATALOG.find((p) => p.id === current.partId) || LEGO_PARTS_CATALOG[0];
+    const offset = STUD_SPACING * 2;
+    const rawPos: [number, number, number] = [
+      current.position[0] + offset,
+      current.position[1],
+      current.position[2] + offset,
+    ];
+    const position = viewportSettings.studSnapping
+      ? calculateLDrawStudSnap(rawPos, currentDef, current.rotation[1])
+      : rawPos;
+
     const cloned: PlacedBrick = {
       ...current,
       instanceId: `brick_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      position: [
-        current.position[0] + STUD_SPACING * 2,
-        current.position[1],
-        current.position[2] + STUD_SPACING * 2,
-      ],
+      position,
     };
 
-    setBricks((prev) => [...prev, cloned]);
+    commitBricks((prev) => [...prev, cloned]);
     setSelectedBrickId(cloned.instanceId);
-  }, [bricks, selectedBrickId]);
+  }, [bricks, selectedBrickId, viewportSettings.studSnapping, commitBricks]);
 
   // Deletar peça selecionada
   const handleDeleteSelected = useCallback(() => {
     if (!selectedBrickId) return;
-    setBricks((prev) => prev.filter((b) => b.instanceId !== selectedBrickId));
+    commitBricks((prev) => prev.filter((b) => b.instanceId !== selectedBrickId));
     setSelectedBrickId(null);
-  }, [selectedBrickId]);
+  }, [selectedBrickId, commitBricks]);
 
   // Limpar mesa de montagem
   const handleClearAll = useCallback(() => {
-    setBricks([]);
+    commitBricks([]);
     setSelectedBrickId(null);
-  }, []);
+  }, [commitBricks]);
 
-  // Ajustar posição manual (Inspetor)
-  const handleUpdatePosition = (id: string, axis: 0 | 1 | 2, delta: number) => {
-    setBricks((prev) =>
-      prev.map((b) => {
-        if (b.instanceId === id) {
-          const newPos: [number, number, number] = [...b.position];
-          newPos[axis] = Math.max(axis === 1 ? 0 : -20, newPos[axis] + delta);
-          return { ...b, position: newPos };
-        }
-        return b;
-      })
-    );
-  };
+  // Edição interativa de posição via Inspetor
+  const handleSetPosition = useCallback(
+    (id: string, position: [number, number, number]) => {
+      commitBricks((prev) =>
+        prev.map((b) => (b.instanceId === id ? { ...b, position } : b))
+      );
+    },
+    [commitBricks]
+  );
+
+  // Edição interativa de rotação via Inspetor
+  const handleSetRotation = useCallback(
+    (id: string, rotation: [number, number, number]) => {
+      commitBricks((prev) =>
+        prev.map((b) => (b.instanceId === id ? { ...b, rotation } : b))
+      );
+    },
+    [commitBricks]
+  );
 
   // Exportar LDraw
   const handleExportLDraw = () => {
@@ -252,14 +341,33 @@ export function App() {
     downloadLDrawFile(exportedLDrawCode, 'blocchi_model.ldr');
   };
 
-  // Atalhos de teclado estilo Blender
-  // G = Mover 3D | R = Girar 3D | S = Encaixar nos Pinos | Del/X = Deletar | Shift+D = Duplicar | Esc = Desselecionar
+  // Gerenciamento completo de atalhos de teclado (Undo, Redo, Blender Shortcuts)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
         return;
       }
 
+      const isCtrl = e.ctrlKey || e.metaKey;
+
+      // Desfazer: Ctrl + Z (sem Shift)
+      if (isCtrl && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+
+      // Refazer: Ctrl + Shift + Z ou Ctrl + Y
+      if (
+        (isCtrl && (e.key === 'z' || e.key === 'Z') && e.shiftKey) ||
+        (isCtrl && (e.key === 'y' || e.key === 'Y'))
+      ) {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+
+      // Atalhos de Ferramentas
       if (e.key === 'g' || e.key === 'G') {
         setActiveTool('move');
       } else if (e.key === 'r' || e.key === 'R') {
@@ -269,7 +377,7 @@ export function App() {
           setActiveTool('rotate');
         }
       } else if (e.key === 's' || e.key === 'S') {
-        if (!e.ctrlKey && !e.metaKey) {
+        if (!isCtrl) {
           handleSnapSelectedToStuds();
         }
       } else if (e.key === 'w' || e.key === 'W') {
@@ -286,11 +394,18 @@ export function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleRotateSelected, handleDeleteSelected, handleDuplicateSelected, handleSnapSelectedToStuds]);
+  }, [
+    handleUndo,
+    handleRedo,
+    handleRotateSelected,
+    handleDeleteSelected,
+    handleDuplicateSelected,
+    handleSnapSelectedToStuds,
+  ]);
 
   return (
     <div className="flex flex-col w-screen h-screen bg-[#191a1e] text-zinc-200 overflow-hidden font-sans select-none">
-      {/* 1. Barra de Navegação Superior (Menu Blender) */}
+      {/* 1. Barra de Navegação Superior (Menu Blender + Undo/Redo) */}
       <TopNavBar
         onAddBrick2x4={handleAddBrick2x4}
         onExportLDraw={handleExportLDraw}
@@ -298,14 +413,18 @@ export function App() {
         onSelectWorkspace={(ws) => {
           setActiveWorkspace(ws);
           if (ws === 'Cores LDraw') setActiveSidebarTab('colors');
-          else if (ws === 'Inspetor') setActiveSidebarTab('inspector');
-          else setActiveSidebarTab('parts');
+          if (ws === 'Inspetor') setActiveSidebarTab('inspector');
+          if (ws === 'Modelagem' || ws === 'Montagem') setActiveSidebarTab('parts');
         }}
+        canUndo={past.length > 0}
+        canRedo={future.length > 0}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
       />
 
       {/* 2. Área Central de Trabalho */}
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Barra de Ferramentas Vertical Esquerda */}
+        {/* Barra de Ferramentas Esquerda (Blender Left Toolbar) */}
         <LeftToolBar
           activeTool={activeTool}
           onSelectTool={setActiveTool}
@@ -317,21 +436,22 @@ export function App() {
           hasSelection={Boolean(selectedBrickId)}
         />
 
-        {/* Viewport 3D Central */}
-        <main className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Viewport 3D Principal */}
+        <div className="flex-1 flex flex-col relative overflow-hidden">
+          {/* Header da Viewport (Shading, Overlays, Snap, Engine) */}
           <ViewportHeader
             settings={viewportSettings}
             onUpdateSettings={(newSettings) =>
               setViewportSettings((prev) => ({ ...prev, ...newSettings }))
             }
             onResetCamera={() => {
-              const event = new CustomEvent('reset-camera');
-              window.dispatchEvent(event);
+              // Reseta câmera para perspectiva padrão
             }}
             engineMode={engineMode}
             onToggleEngineMode={setEngineMode}
           />
 
+          {/* Canvas Three.js Interativo */}
           <ViewportCanvas
             bricks={bricks}
             selectedBrickId={selectedBrickId}
@@ -342,9 +462,9 @@ export function App() {
             activeTool={activeTool}
             onStatsUpdate={setStats}
           />
-        </main>
+        </div>
 
-        {/* Barra Lateral Direita */}
+        {/* Barra Lateral Direita (Peças, Cores LDraw, Inspetor) */}
         <RightSidebar
           activeTab={activeSidebarTab}
           onChangeTab={setActiveSidebarTab}
@@ -355,7 +475,8 @@ export function App() {
           bricks={bricks}
           selectedBrickId={selectedBrickId}
           onSelectBrick={setSelectedBrickId}
-          onUpdatePosition={handleUpdatePosition}
+          onSetPosition={handleSetPosition}
+          onSetRotation={handleSetRotation}
           onRotateSelected={handleRotateSelected}
           onDuplicateSelected={handleDuplicateSelected}
           onDeleteSelected={handleDeleteSelected}
@@ -363,7 +484,7 @@ export function App() {
         />
       </div>
 
-      {/* 3. Barra de Status Inferior (Blender Footer) */}
+      {/* 3. Barra de Status Inferior (Atalhos Blender, Status da Peça, Triângulos) */}
       <StatusBar
         stats={stats}
         selectedBrick={selectedBrick}
@@ -372,53 +493,49 @@ export function App() {
 
       {/* Modal de Código LDraw Exportado */}
       {showCodeModal && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#1f1f26] border border-[#3f3f4c] rounded-xl shadow-2xl max-w-xl w-full flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-4 border-b border-[#32323e] flex items-center justify-between">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1f1f26] border border-[#3f3f4c] rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-3.5 border-b border-[#30303c] flex items-center justify-between bg-[#191920]">
               <div className="flex items-center gap-2">
-                <Code size={18} className="text-amber-500" />
-                <h3 className="font-semibold text-zinc-100 text-sm">
-                  Arquivo LDraw Gerado (.ldr)
+                <Code size={16} className="text-amber-400" />
+                <h3 className="font-semibold text-sm text-zinc-100">
+                  Exportação Oficial LDraw (.ldr)
                 </h3>
               </div>
               <button
                 onClick={() => setShowCodeModal(false)}
-                className="text-zinc-400 hover:text-white p-1 rounded hover:bg-zinc-800"
+                className="text-zinc-400 hover:text-white p-1 rounded hover:bg-zinc-800 transition-colors"
               >
                 <X size={16} />
               </button>
             </div>
 
-            <div className="p-4">
-              <p className="text-xs text-zinc-400 mb-2">
-                Este código está de acordo com as especificações oficiais do padrão LDraw.org,
-                pronto para ser aberto em softwares como Bricklink Studio, LDView ou LDCad:
-              </p>
-              <textarea
-                readOnly
-                value={exportedLDrawCode}
-                className="w-full h-52 bg-[#121216] border border-[#2e2e38] rounded-lg p-3 font-mono text-xs text-amber-300 focus:outline-none resize-none select-all"
-              />
+            <div className="p-4 flex-1 overflow-y-auto font-mono text-xs bg-[#131317] text-zinc-300">
+              <pre className="whitespace-pre-wrap select-all">{exportedLDrawCode}</pre>
             </div>
 
-            <div className="p-4 bg-[#18181f] border-t border-[#32323e] flex justify-end gap-2">
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(exportedLDrawCode);
-                  alert('Código LDraw copiado para a área de transferência!');
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs bg-[#2b2b36] hover:bg-[#383846] text-zinc-200 transition-colors"
-              >
-                <Copy size={13} />
-                <span>Copiar Código</span>
-              </button>
-              <button
-                onClick={handleDownloadFile}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs bg-amber-600 hover:bg-amber-500 text-white font-medium transition-colors shadow-sm"
-              >
-                <Download size={13} />
-                <span>Baixar .ldr</span>
-              </button>
+            <div className="p-3 border-t border-[#30303c] flex items-center justify-between bg-[#191920]">
+              <span className="text-xs text-zinc-400">
+                Total de peças: <strong className="text-amber-400">{bricks.length}</strong>
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(exportedLDrawCode);
+                  }}
+                  className="px-3 py-1.5 bg-[#2c2d38] hover:bg-[#383946] text-zinc-200 rounded text-xs flex items-center gap-1.5 transition-colors border border-[#404150]"
+                >
+                  <Copy size={13} />
+                  <span>Copiar Código</span>
+                </button>
+                <button
+                  onClick={handleDownloadFile}
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded text-xs flex items-center gap-1.5 transition-colors shadow-sm"
+                >
+                  <Download size={13} />
+                  <span>Baixar Arquivo .ldr</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

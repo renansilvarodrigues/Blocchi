@@ -1,3 +1,4 @@
+import React from 'react';
 import { Activity } from 'lucide-react';
 import type { PlacedBrick } from '../../types/lego';
 import { LEGO_PARTS_CATALOG } from '../../ldraw/partsData';
@@ -18,33 +19,40 @@ export const StatusBar: React.FC<StatusBarProps> = ({ stats, selectedBrick, engi
   return (
     <footer className="h-6 bg-[#18181c] border-t border-[#2d2d35] px-3 flex items-center justify-between text-[11px] text-zinc-400 select-none z-20">
       {/* Lado Esquerdo: Atalhos e Navegação do Blender */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1.5 text-zinc-400">
+      <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-1 text-zinc-400">
           <span className="bg-amber-600/30 text-amber-300 border border-amber-500/40 px-1 rounded text-[10px] font-mono font-bold">
             G
           </span>
-          <span>Mover 3D</span>
+          <span>Mover</span>
         </div>
         <span className="text-zinc-600">•</span>
-        <div className="flex items-center gap-1.5 text-zinc-400">
+        <div className="flex items-center gap-1 text-zinc-400">
           <span className="bg-amber-600/30 text-amber-300 border border-amber-500/40 px-1 rounded text-[10px] font-mono font-bold">
             R
           </span>
-          <span>Girar 3D</span>
+          <span>Girar</span>
         </div>
         <span className="text-zinc-600">•</span>
-        <div className="flex items-center gap-1.5 text-zinc-400">
+        <div className="flex items-center gap-1 text-zinc-400">
           <span className="bg-amber-600/30 text-amber-300 border border-amber-500/40 px-1 rounded text-[10px] font-mono font-bold">
             S
           </span>
-          <span>Encaixar Pinos</span>
+          <span>Snap Studs</span>
         </div>
         <span className="text-zinc-600">•</span>
-        <div className="flex items-center gap-1.5 text-zinc-400">
+        <div className="flex items-center gap-1 text-zinc-400">
           <span className="bg-[#282832] text-zinc-300 px-1 rounded text-[10px] font-mono">
-            Shift + Clique
+            Ctrl+Z
           </span>
-          <span>Pan Mesa</span>
+          <span>Desfazer</span>
+        </div>
+        <span className="text-zinc-600">•</span>
+        <div className="flex items-center gap-1 text-zinc-400">
+          <span className="bg-[#282832] text-zinc-300 px-1 rounded text-[10px] font-mono">
+            Ctrl+Y
+          </span>
+          <span>Refazer</span>
         </div>
       </div>
 
@@ -60,7 +68,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({ stats, selectedBrick, engi
         </div>
       ) : (
         <div className="text-zinc-500 italic">
-          Nenhuma peça selecionada (clique para selecionar)
+          Nenhuma peça selecionada (clique em qualquer face para selecionar)
         </div>
       )}
 

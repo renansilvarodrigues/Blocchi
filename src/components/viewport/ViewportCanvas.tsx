@@ -5,7 +5,13 @@ import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import type { PlacedBrick, ViewportSettings, ToolMode } from '../../types/lego';
 import { createAssemblyTable } from './ViewportGrid';
 import { ViewportGizmo } from './ViewportGizmo';
-import { createBrickMesh, STUD_SPACING } from '../../ldraw/proceduralBricks';
+import {
+  createBrickMesh,
+  calculateLDrawStudSnap,
+  snapToUnderlyingStuds,
+  PLATE_HEIGHT,
+  STUD_SPACING,
+} from '../../ldraw/proceduralBricks';
 import { loadLDrawPart } from '../../ldraw/ldrawLoaderHelper';
 import { LEGO_PARTS_CATALOG } from '../../ldraw/partsData';
 
@@ -47,17 +53,19 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
   const [activeCamera, setActiveCamera] = useState<THREE.PerspectiveCamera | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Refs para controle seguro de eventos sem recriar listeners
   const isTransformDraggingRef = useRef(false);
   const pointerDownPosRef = useRef<{ x: number; y: number } | null>(null);
   const selectedBrickIdRef = useRef<string | null>(selectedBrickId);
-  selectedBrickIdRef.current = selectedBrickId;
-
+  const bricksRef = useRef(bricks);
   const settingsRef = useRef(settings);
-  settingsRef.current = settings;
-
   const onUpdateBrickTransformRef = useRef(onUpdateBrickTransform);
-  onUpdateBrickTransformRef.current = onUpdateBrickTransform;
+
+  useEffect(() => {
+    selectedBrickIdRef.current = selectedBrickId;
+    bricksRef.current = bricks;
+    settingsRef.current = settings;
+    onUpdateBrickTransformRef.current = onUpdateBrickTransform;
+  }, [selectedBrickId, bricks, settings, onUpdateBrickTransform]);
 
   // Inicialização da Cena Three.js
   useEffect(() => {
@@ -67,7 +75,7 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
     // 1. Cena
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x191a1e);
-    scene.fog = new THREE.FogExp2(0x191a1e, 0.015);
+    scene.fog = new THREE.FogExp2(0x191a1e, 0.012);
     sceneRef.current = scene;
 
     // 2. Câmera
@@ -96,63 +104,125 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // 4. OrbitControls
+    // 4. OrbitControls: Rotação livre 360 graus em todos os eixos (sem limites de polarAngle)
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.maxPolarAngle = Math.PI / 2 - 0.01; // não deixa a câmera descer abaixo da mesa
-    controls.minDistance = 1.5;
-    controls.maxDistance = 60;
+    controls.minPolarAngle = 0; // Permite olhar de cima para baixo
+    controls.maxPolarAngle = Math.PI; // ROTAÇÃO 360° LIVRE: Permite olhar completamente de baixo para cima!
+    controls.minDistance = 1.0;
+    controls.maxDistance = 80;
     controls.target.set(0, 0.5, 0);
     controlsRef.current = controls;
 
-    // 5. TransformControls (Gizmo 3D de manipulação nos 3 eixos)
+    // 5. TransformControls (Gizmo 3D)
     const transformControls = new TransformControls(camera, renderer.domElement);
     transformControls.size = 0.85;
     const transformHelper = transformControls.getHelper();
     scene.add(transformHelper);
     transformControlsRef.current = transformControls;
 
-    // Desabilitar OrbitControls durante manipulação no gizmo 3D
+    // Desabilitar OrbitControls durante manipulação no gizmo
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     transformControls.addEventListener('dragging-changed', (event: any) => {
       controls.enabled = !event.value;
       isTransformDraggingRef.current = event.value;
 
-      // Quando soltar o gizmo (drag finalizado), sincronizar posição com o estado React
+      // Ao soltar o gizmo (drag finalizado), sincronizar posição e rotação exata
       if (!event.value && selectedBrickIdRef.current && transformControls.object) {
         const obj = transformControls.object;
         onUpdateBrickTransformRef.current(
           selectedBrickIdRef.current,
-          [obj.position.x, obj.position.y, obj.position.z],
-          [obj.rotation.x, obj.rotation.y, obj.rotation.z]
+          [
+            Math.round(obj.position.x * 1000) / 1000,
+            Math.round(obj.position.y * 1000) / 1000,
+            Math.round(obj.position.z * 1000) / 1000,
+          ],
+          [
+            Math.round(obj.rotation.x * 1000) / 1000,
+            Math.round(obj.rotation.y * 1000) / 1000,
+            Math.round(obj.rotation.z * 1000) / 1000,
+          ]
         );
       }
     });
 
-    // Snapping em tempo real durante movimentação pelo gizmo
+    // Snapping oficial rigoroso LDraw em tempo real durante movimentação pelo gizmo
     transformControls.addEventListener('objectChange', () => {
       const obj = transformControls.object;
-      if (!obj) return;
+      if (!obj || !selectedBrickIdRef.current) return;
 
       if (settingsRef.current.studSnapping) {
-        // Snap horizontal aos studs (0.8 unidades)
-        obj.position.x = Math.round(obj.position.x / STUD_SPACING) * STUD_SPACING;
-        obj.position.z = Math.round(obj.position.z / STUD_SPACING) * STUD_SPACING;
-        // Snap vertical à altura dos blocos/plates (múltiplos de 0.32, com mínimo 0)
-        obj.position.y = Math.max(0, Math.round(obj.position.y / 0.32) * 0.32);
+        const currentBrick = bricksRef.current.find((b) => b.instanceId === selectedBrickIdRef.current);
+        const partDef = currentBrick
+          ? LEGO_PARTS_CATALOG.find((p) => p.id === currentBrick.partId)
+          : null;
+
+        if (partDef) {
+          const curHalfW = (partDef.dimensions.studsX * STUD_SPACING) / 2;
+          const curHalfL = (partDef.dimensions.studsZ * STUD_SPACING) / 2;
+
+          let bestUnderlying: { brick: PlacedBrick; def: typeof partDef; topY: number } | null = null;
+
+          for (const other of bricksRef.current) {
+            if (other.instanceId === selectedBrickIdRef.current) continue;
+            const otherDef = LEGO_PARTS_CATALOG.find((p) => p.id === other.partId);
+            if (!otherDef) continue;
+
+            const otherHalfW = (otherDef.dimensions.studsX * STUD_SPACING) / 2;
+            const otherHalfL = (otherDef.dimensions.studsZ * STUD_SPACING) / 2;
+            const otherHeight = otherDef.dimensions.heightPlates * PLATE_HEIGHT;
+            const topSurface = other.position[1] + otherHeight;
+
+            const overlapX = Math.abs(obj.position.x - other.position[0]) < curHalfW + otherHalfW + 0.2;
+            const overlapZ = Math.abs(obj.position.z - other.position[2]) < curHalfL + otherHalfL + 0.2;
+
+            if (overlapX && overlapZ && topSurface <= obj.position.y + 0.4) {
+              if (!bestUnderlying || topSurface > bestUnderlying.topY) {
+                bestUnderlying = { brick: other, def: otherDef, topY: topSurface };
+              }
+            }
+          }
+
+          if (bestUnderlying) {
+            const snapped = snapToUnderlyingStuds(
+              [obj.position.x, obj.position.y, obj.position.z],
+              partDef,
+              obj.rotation.y,
+              bestUnderlying.brick,
+              bestUnderlying.def
+            );
+            obj.position.x = snapped[0];
+            obj.position.y = snapped[1];
+            obj.position.z = snapped[2];
+          } else {
+            const snapped = calculateLDrawStudSnap(
+              [obj.position.x, obj.position.y, obj.position.z],
+              partDef,
+              obj.rotation.y
+            );
+            obj.position.x = snapped[0];
+            obj.position.y = snapped[1];
+            obj.position.z = snapped[2];
+          }
+        } else {
+          const snapped = calculateLDrawStudSnap([obj.position.x, obj.position.y, obj.position.z]);
+          obj.position.x = snapped[0];
+          obj.position.y = snapped[1];
+          obj.position.z = snapped[2];
+        }
       }
     });
 
-    // 6. Iluminação de Estúdio
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+    // 6. Iluminação de Estúdio 3D Completa (Superior e Inferior para visualização 360)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     scene.add(ambientLight);
 
-    const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x1a1a20, 0.5);
+    const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x22222a, 0.6);
     scene.add(hemiLight);
 
-    // Key Light com projeção de sombras detalhadas
-    const keyLight = new THREE.DirectionalLight(0xfff5e6, 1.8);
+    // Key Light com sombras suaves
+    const keyLight = new THREE.DirectionalLight(0xfff5e6, 1.6);
     keyLight.position.set(8, 14, 8);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 2048;
@@ -173,6 +243,11 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
     const rimLight = new THREE.DirectionalLight(0xffffff, 0.6);
     rimLight.position.set(0, 6, -10);
     scene.add(rimLight);
+
+    // Luz inferior suave para iluminar a parte de baixo (cavidades e tubos) ao visualizar por baixo
+    const bottomLight = new THREE.DirectionalLight(0x9aa8b8, 0.55);
+    bottomLight.position.set(0, -12, 0);
+    scene.add(bottomLight);
 
     // 7. Mesa de Montagem com Grid
     const tableGroup = createAssemblyTable();
@@ -238,8 +313,7 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
     }
 
     if (settings.studSnapping) {
-      tc.setTranslationSnap(STUD_SPACING);
-      tc.setRotationSnap(Math.PI / 2);
+      tc.setRotationSnap(Math.PI / 2); // Giro exato de 90 graus
     } else {
       tc.setTranslationSnap(null);
       tc.setRotationSnap(null);
@@ -266,7 +340,6 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
     let isCancelled = false;
     setIsLoading(true);
 
-    // Se estiver manipulando o gizmo, desanexar temporariamente durante recriação
     if (tc) tc.detach();
 
     // Limpar peças anteriores
@@ -301,7 +374,6 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
         brickMesh.position.set(...brick.position);
         brickMesh.rotation.set(...brick.rotation);
 
-        // Controlar visibilidade de arestas / outlines
         brickMesh.traverse((child) => {
           if ((child as THREE.LineSegments).isLineSegments) {
             child.visible = settings.showOutlines;
@@ -310,7 +382,6 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
 
         group.add(brickMesh);
 
-        // Contabilizar geometria
         brickMesh.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
@@ -335,7 +406,7 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
         triangles: Math.round(totalTriangles),
       });
 
-      // Reconectar TransformControls e SelectionBox à peça selecionada
+      // Reconectar TransformControls e SelectionBox
       if (selectedBrickIdRef.current) {
         const selectedObj = group.getObjectByName(selectedBrickIdRef.current);
         if (selectedObj) {
@@ -357,7 +428,7 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
     };
   }, [bricks, engineMode, settings.shadingMode, settings.showOutlines, onStatsUpdate]);
 
-  // Atualizar anexo do TransformControls e indicador de seleção quando a seleção muda
+  // Atualizar anexo do TransformControls e indicador de seleção
   useEffect(() => {
     const box = selectionBoxRef.current;
     const group = bricksGroupRef.current;
@@ -385,27 +456,15 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
     }
   }, [selectedBrickId]);
 
-  // Captura do início do clique para diferenciar de arraste de câmera
+  // Captura do clique inicial
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     pointerDownPosRef.current = { x: event.clientX, y: event.clientY };
   };
 
-  // Processamento do clique ao soltar o botão:
-  // Se o mouse moveu > 4px, foi rotação de órbita da viewport e a seleção NUNCA é perdida!
-  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || !pointerDownPosRef.current) return;
-
-    const dx = event.clientX - pointerDownPosRef.current.x;
-    const dy = event.clientY - pointerDownPosRef.current.y;
-    pointerDownPosRef.current = null;
-
-    // Se o ponteiro se moveu significativamente, foi movimentação de câmera ou do gizmo
-    if (Math.hypot(dx, dy) > 4 || isTransformDraggingRef.current) {
-      return;
-    }
-
-    // Clique genuíno (estático): executar raycasting
+  // Efeito de cursor hover sobre peças
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (isTransformDraggingRef.current) return;
     const container = containerRef.current;
     const camera = cameraRef.current;
     const group = bricksGroupRef.current;
@@ -421,9 +480,51 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
     raycaster.setFromCamera(mouse, camera);
 
     const intersects = raycaster.intersectObjects(group.children, true);
+    const hasMeshHit = intersects.some(
+      (hit) => (hit.object as THREE.Mesh).isMesh && hit.object.visible
+    );
 
-    if (intersects.length > 0) {
-      let target: THREE.Object3D | null = intersects[0].object;
+    container.style.cursor = hasMeshHit ? 'pointer' : 'default';
+  };
+
+  // Processamento ultra-preciso de seleção via Raycasting (Primeiro Clique em Qualquer Face)
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || !pointerDownPosRef.current) return;
+
+    const dx = event.clientX - pointerDownPosRef.current.x;
+    const dy = event.clientY - pointerDownPosRef.current.y;
+    pointerDownPosRef.current = null;
+
+    // Se o mouse moveu > 8px ou se estava manipulando o gizmo, foi arraste/órbita
+    if (Math.hypot(dx, dy) > 8 || isTransformDraggingRef.current) {
+      return;
+    }
+
+    const container = containerRef.current;
+    const camera = cameraRef.current;
+    const group = bricksGroupRef.current;
+    if (!container || !camera || !group) return;
+
+    const rect = container.getBoundingClientRect();
+    const mouse = new THREE.Vector2(
+      ((event.clientX - rect.left) / container.clientWidth) * 2 - 1,
+      -((event.clientY - rect.top) / container.clientHeight) * 2 + 1
+    );
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+
+    // Raycast apenas nos meshes visíveis das peças Lego
+    const intersects = raycaster.intersectObjects(group.children, true);
+
+    // Filtrar apenas objetos Mesh reais e visíveis (desconsidera linhas de aresta e helpers)
+    const validMeshHit = intersects.find(
+      (hit) => (hit.object as THREE.Mesh).isMesh && hit.object.visible
+    );
+
+    if (validMeshHit) {
+      let target: THREE.Object3D | null = validMeshHit.object;
+      // Rastrear até a raiz da peça (filho direto de group)
       while (target && target.parent && target.parent !== group) {
         target = target.parent;
       }
@@ -433,12 +534,12 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
       }
     }
 
-    // Clicou no vazio da mesa/fundo: remove seleção
+    // Clique no vazio (mesa ou espaço livre): desseleciona
     onSelectBrick(null);
   };
 
-  // Funções de câmera para o Gizmo
-  const handleViewSelect = useCallback((view: 'top' | 'front' | 'right' | 'perspective') => {
+  // Funções de câmera para o Gizmo (incluindo visão inferior "bottom")
+  const handleViewSelect = useCallback((view: 'top' | 'bottom' | 'front' | 'right' | 'perspective') => {
     const camera = cameraRef.current;
     const controls = controlsRef.current;
     if (!camera || !controls) return;
@@ -446,6 +547,8 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
     const dist = 10;
     if (view === 'top') {
       camera.position.set(0, dist, 0.001);
+    } else if (view === 'bottom') {
+      camera.position.set(0, -dist, 0.001);
     } else if (view === 'front') {
       camera.position.set(0, 1.5, dist);
     } else if (view === 'right') {
@@ -461,8 +564,9 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
     <div
       ref={containerRef}
       onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      className="relative flex-1 w-full h-full overflow-hidden select-none cursor-grab active:cursor-grabbing focus:outline-none bg-[#191a1e]"
+      className="relative flex-1 w-full h-full overflow-hidden select-none focus:outline-none bg-[#191a1e]"
     >
       {/* Gizmo Blender no canto superior direito */}
       <ViewportGizmo camera={activeCamera} onViewSelect={handleViewSelect} />
@@ -475,9 +579,11 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
         </div>
       )}
 
-      {/* Indicador de Unidades e Modo no canto inferior esquerdo */}
-      <div className="absolute bottom-3 left-3 bg-[#1e1e24]/80 backdrop-blur-md px-2.5 py-1 rounded border border-[#3f3f46]/50 text-[10px] text-zinc-400 pointer-events-none flex items-center gap-2 z-10">
+      {/* Indicador de Unidades e Modo */}
+      <div className="absolute bottom-3 left-3 bg-[#1e1e24]/85 backdrop-blur-md px-2.5 py-1 rounded border border-[#3f3f46]/50 text-[10px] text-zinc-400 pointer-events-none flex items-center gap-2 z-10 shadow-md">
         <span>Grid: 1 Stud = 20 LDU (8mm)</span>
+        <span className="text-zinc-600">|</span>
+        <span>H: 24 LDU Brick / 8 LDU Plate</span>
         <span className="text-zinc-600">|</span>
         <span className="text-amber-400 font-mono">
           {activeTool === 'rotate' ? 'Giro 3D Ativo (R)' : 'Manipulador 3D Ativo (G)'}

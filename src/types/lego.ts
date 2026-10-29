@@ -8,13 +8,14 @@ export interface LDrawColor {
   hex: string;
   edgeHex?: string;
   category: 'solid' | 'transparent' | 'metallic' | 'special';
+  finish?: 'solid' | 'transparent' | 'chrome' | 'pearl' | 'metal' | 'rubber' | 'glow';
   isTrans?: boolean;
 }
 
 export interface LegoPartDefinition {
   id: string; // e.g. "3001"
   name: string; // "Brick 2 x 4"
-  category: 'Bricks' | 'Plates' | 'Tiles' | 'Slopes' | 'Baseplates';
+  category: 'Bricks' | 'Plates' | 'Tiles' | 'Slopes' | 'Baseplates' | 'Rounds' | 'Technic';
   dimensions: {
     studsX: number;
     studsZ: number;

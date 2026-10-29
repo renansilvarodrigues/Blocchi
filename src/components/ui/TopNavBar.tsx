@@ -1,7 +1,10 @@
+import React from 'react';
 import {
   Box,
   Download,
-  Plus
+  Plus,
+  Undo2,
+  Redo2,
 } from 'lucide-react';
 
 interface TopNavBarProps {
@@ -9,6 +12,10 @@ interface TopNavBarProps {
   onExportLDraw: () => void;
   activeWorkspace: string;
   onSelectWorkspace: (ws: string) => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 export const TopNavBar: React.FC<TopNavBarProps> = ({
@@ -16,6 +23,10 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   onExportLDraw,
   activeWorkspace,
   onSelectWorkspace,
+  canUndo = false,
+  canRedo = false,
+  onUndo,
+  onRedo,
 }) => {
   return (
     <header className="h-10 bg-[#1e1e24] border-b border-[#32323a] px-3 flex items-center justify-between text-xs text-zinc-300 select-none z-20">
@@ -34,8 +45,35 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           </span>
         </div>
 
-        {/* Menus de aplicação estilo Blender */}
+        {/* Menus e Ações de Histórico */}
         <nav className="flex items-center gap-1 text-zinc-400">
+          <div className="flex items-center bg-[#151518] p-0.5 rounded border border-[#2e2e38] mr-1">
+            <button
+              onClick={onUndo}
+              disabled={!canUndo}
+              className={`p-1 rounded transition-colors flex items-center gap-1 ${
+                canUndo
+                  ? 'text-zinc-200 hover:text-white hover:bg-zinc-700/60'
+                  : 'text-zinc-600 cursor-not-allowed'
+              }`}
+              title="Desfazer ação (Ctrl + Z)"
+            >
+              <Undo2 size={13} />
+            </button>
+            <button
+              onClick={onRedo}
+              disabled={!canRedo}
+              className={`p-1 rounded transition-colors flex items-center gap-1 ${
+                canRedo
+                  ? 'text-zinc-200 hover:text-white hover:bg-zinc-700/60'
+                  : 'text-zinc-600 cursor-not-allowed'
+              }`}
+              title="Refazer ação (Ctrl + Shift + Z ou Ctrl + Y)"
+            >
+              <Redo2 size={13} />
+            </button>
+          </div>
+
           <button className="px-2 py-1 rounded hover:bg-zinc-800 hover:text-zinc-100 transition-colors">
             File
           </button>
@@ -50,9 +88,6 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           </button>
           <button className="px-2 py-1 rounded hover:bg-zinc-800 hover:text-zinc-100 transition-colors">
             Render
-          </button>
-          <button className="px-2 py-1 rounded hover:bg-zinc-800 hover:text-zinc-100 transition-colors">
-            Window
           </button>
           <button className="px-2 py-1 rounded hover:bg-zinc-800 hover:text-zinc-100 transition-colors">
             Help
@@ -80,7 +115,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
       {/* Centro: Nome do Arquivo */}
       <div className="hidden md:flex items-center gap-2 font-mono text-[11px] text-zinc-400 bg-[#16161a] px-3 py-1 rounded border border-[#2c2c35]">
         <span className="text-zinc-500">Projeto:</span>
-        <span className="text-amber-400 font-medium">lego_model_test.ldr</span>
+        <span className="text-amber-400 font-medium">blocchi_model.ldr</span>
       </div>
 
       {/* Lado Direito: Ações Rápidas */}
@@ -96,7 +131,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
 
         <button
           onClick={onExportLDraw}
-          className="flex items-center gap-1.5 bg-[#2b2c35] hover:bg-[#383944] text-zinc-200 border border-[#444552] font-medium px-2.5 py-1 rounded text-xs transition-colors"
+          className="flex items-center gap-1.5 bg-[#2b2c35] hover:bg-[#383944] text-zinc-200 border border-[#444552] font-medium px-2.5 py-1 rounded text-xs transition-colors shadow-sm"
           title="Exportar código no formato padrão LDraw (.ldr)"
         >
           <Download size={13} />

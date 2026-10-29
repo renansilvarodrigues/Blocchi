@@ -3,7 +3,7 @@ import * as THREE from 'three';
 
 interface ViewportGizmoProps {
   camera: THREE.PerspectiveCamera | null;
-  onViewSelect: (view: 'top' | 'front' | 'right' | 'perspective') => void;
+  onViewSelect: (view: 'top' | 'bottom' | 'front' | 'right' | 'perspective') => void;
 }
 
 export const ViewportGizmo: React.FC<ViewportGizmoProps> = ({ camera, onViewSelect }) => {
@@ -25,7 +25,7 @@ export const ViewportGizmo: React.FC<ViewportGizmoProps> = ({ camera, onViewSele
       const centerY = canvas.height / 2;
       const radius = 34;
 
-      // Desenha o círculo de fundo do gizmo
+      // Fundo circular do gizmo
       ctx.beginPath();
       ctx.arc(centerX, centerY, radius + 8, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(30, 30, 36, 0.65)';
@@ -34,16 +34,15 @@ export const ViewportGizmo: React.FC<ViewportGizmoProps> = ({ camera, onViewSele
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // Projeta os eixos da câmera
+      // Projeção dos eixos da câmera
       const matrix = new THREE.Matrix4().extractRotation(camera.matrixWorldInverse);
 
       const axes = [
-        { label: 'X', color: '#EF4444', dir: new THREE.Vector3(1, 0, 0), negLabel: '-X' },
-        { label: 'Y', color: '#10B981', dir: new THREE.Vector3(0, 1, 0), negLabel: '-Y' },
-        { label: 'Z', color: '#3B82F6', dir: new THREE.Vector3(0, 0, 1), negLabel: '-Z' },
+        { label: 'X', color: '#EF4444', dir: new THREE.Vector3(1, 0, 0) },
+        { label: 'Y', color: '#10B981', dir: new THREE.Vector3(0, 1, 0) },
+        { label: 'Z', color: '#3B82F6', dir: new THREE.Vector3(0, 0, 1) },
       ];
 
-      // Ordenar por profundidade (Z projetado) para desenhar do mais distante ao mais próximo
       const projected = axes.map(axis => {
         const p = axis.dir.clone().applyMatrix4(matrix);
         return {
@@ -55,7 +54,6 @@ export const ViewportGizmo: React.FC<ViewportGizmoProps> = ({ camera, onViewSele
       }).sort((a, b) => a.depth - b.depth);
 
       for (const axis of projected) {
-        // Linha do eixo
         ctx.beginPath();
         ctx.moveTo(centerX, centerY);
         ctx.lineTo(axis.screenX, axis.screenY);
@@ -63,13 +61,11 @@ export const ViewportGizmo: React.FC<ViewportGizmoProps> = ({ camera, onViewSele
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Círculo com letra
         ctx.beginPath();
         ctx.arc(axis.screenX, axis.screenY, 8, 0, Math.PI * 2);
         ctx.fillStyle = axis.color;
         ctx.fill();
 
-        // Texto
         ctx.fillStyle = '#FFFFFF';
         ctx.font = 'bold 9px sans-serif';
         ctx.textAlign = 'center';
@@ -97,18 +93,26 @@ export const ViewportGizmo: React.FC<ViewportGizmoProps> = ({ camera, onViewSele
         onClick={() => onViewSelect('perspective')}
         title="Gizmo de Orientação 3D (Blender Navigation)"
       />
-      <div className="flex gap-1 mt-1 bg-[#1e1e24]/80 backdrop-blur-md px-1.5 py-0.5 rounded border border-[#3f3f46]/60 text-[10px] text-zinc-300">
+      <div className="flex gap-1 mt-1 bg-[#1e1e24]/85 backdrop-blur-md px-1.5 py-0.5 rounded border border-[#3f3f46]/60 text-[10px] text-zinc-300 shadow-lg">
         <button
           onClick={() => onViewSelect('top')}
-          className="hover:text-white hover:bg-zinc-700/60 px-1 rounded transition-colors"
-          title="Vista Superior"
+          className="hover:text-amber-400 hover:bg-zinc-700/60 px-1 rounded transition-colors"
+          title="Vista Superior (Topo)"
         >
           Top
         </button>
         <span className="text-zinc-600">|</span>
         <button
+          onClick={() => onViewSelect('bottom')}
+          className="hover:text-amber-400 hover:bg-zinc-700/60 px-1 rounded transition-colors"
+          title="Vista Inferior (De baixo para cima)"
+        >
+          Bottom
+        </button>
+        <span className="text-zinc-600">|</span>
+        <button
           onClick={() => onViewSelect('front')}
-          className="hover:text-white hover:bg-zinc-700/60 px-1 rounded transition-colors"
+          className="hover:text-amber-400 hover:bg-zinc-700/60 px-1 rounded transition-colors"
           title="Vista Frontal"
         >
           Front
@@ -116,8 +120,8 @@ export const ViewportGizmo: React.FC<ViewportGizmoProps> = ({ camera, onViewSele
         <span className="text-zinc-600">|</span>
         <button
           onClick={() => onViewSelect('right')}
-          className="hover:text-white hover:bg-zinc-700/60 px-1 rounded transition-colors"
-          title="Vista Lateral"
+          className="hover:text-amber-400 hover:bg-zinc-700/60 px-1 rounded transition-colors"
+          title="Vista Lateral Direita"
         >
           Right
         </button>

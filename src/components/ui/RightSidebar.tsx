@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Box, Palette, Sliders, ChevronRight, ChevronLeft } from 'lucide-react';
 import { PartsCatalog } from './PartsCatalog';
 import { ColorPalette } from './ColorPalette';
@@ -15,7 +15,8 @@ interface RightSidebarProps {
   bricks: PlacedBrick[];
   selectedBrickId: string | null;
   onSelectBrick: (id: string | null) => void;
-  onUpdatePosition: (id: string, axis: 0 | 1 | 2, delta: number) => void;
+  onSetPosition: (id: string, position: [number, number, number]) => void;
+  onSetRotation: (id: string, rotation: [number, number, number]) => void;
   onRotateSelected: () => void;
   onDuplicateSelected: () => void;
   onDeleteSelected: () => void;
@@ -32,7 +33,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   bricks,
   selectedBrickId,
   onSelectBrick,
-  onUpdatePosition,
+  onSetPosition,
+  onSetRotation,
   onRotateSelected,
   onDuplicateSelected,
   onDeleteSelected,
@@ -66,7 +68,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
             onChangeTab('colors');
           }}
           className={`p-1.5 rounded ${activeTab === 'colors' ? 'text-amber-400' : 'text-zinc-400'}`}
-          title="Cores"
+          title="Cores LDraw"
         >
           <Palette size={16} />
         </button>
@@ -152,7 +154,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
             bricks={bricks}
             selectedBrickId={selectedBrickId}
             onSelectBrick={onSelectBrick}
-            onUpdatePosition={onUpdatePosition}
+            onSetPosition={onSetPosition}
+            onSetRotation={onSetRotation}
             onRotateSelected={onRotateSelected}
             onDuplicateSelected={onDuplicateSelected}
             onDeleteSelected={onDeleteSelected}
