@@ -2,7 +2,10 @@
 
 Uma aplicação web moderna de montagem de blocos de Lego, desenvolvida em **React**, **Three.js** e **Tailwind CSS**, com integração ao padrão oficial **LDraw**.
 
-![Blocchi Studio Preview]([https://images.unsplash.com/photo-1716406756220-a1e40d06420d?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D])
+![Texto Alternativo](
+https://images.unsplash.com/photo-1716406756220-a1e40d06420d?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D
+)
+
 
 ---
 
@@ -138,4 +141,4 @@ blocchi/
 
 ## 📄 Licença
 
-Este projeto é distribuído sob a licença MIT. Sinta-se livre para usar, estudar e contribuir!
+Este projeto é distribuído sob a licença MIT.
