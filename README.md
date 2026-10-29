@@ -2,7 +2,7 @@
 
 Uma aplicação web moderna de montagem de blocos de Lego, desenvolvida em **React**, **Three.js** e **Tailwind CSS**, com integração ao padrão oficial **LDraw**.
 
-![Blocchi Studio Preview](https://images.unsplash.com/photo-1585366119957-e9730b6d0f60?auto=format&fit=crop&w=1200&q=80)
+![Blocchi Studio Preview](https://images.unsplash.com/photo-1585366119957-e9730b6d0f60?auto=format&fit=crop&w=1200&q=80](https://images.unsplash.com/photo-1716406756220-a1e40d06420d?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D)
 
 ---
 
