@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity } from 'lucide-react';
+import { Activity, Layers } from 'lucide-react';
 import type { PlacedBrick } from '../../types/lego';
 import { LEGO_PARTS_CATALOG } from '../../ldraw/partsData';
 import { getLDrawColor } from '../../ldraw/colors';
@@ -7,10 +7,16 @@ import { getLDrawColor } from '../../ldraw/colors';
 interface StatusBarProps {
   stats: { count: number; vertices: number; triangles: number };
   selectedBrick: PlacedBrick | null;
+  selectedCount?: number;
   engineMode: 'procedural' | 'ldraw';
 }
 
-export const StatusBar: React.FC<StatusBarProps> = ({ stats, selectedBrick, engineMode }) => {
+export const StatusBar: React.FC<StatusBarProps> = ({
+  stats,
+  selectedBrick,
+  selectedCount = 0,
+  engineMode,
+}) => {
   const partDef = selectedBrick
     ? LEGO_PARTS_CATALOG.find((p) => p.id === selectedBrick.partId)
     : null;
@@ -56,8 +62,18 @@ export const StatusBar: React.FC<StatusBarProps> = ({ stats, selectedBrick, engi
         </div>
       </div>
 
-      {/* Centro: Peça Selecionada */}
-      {selectedBrick && partDef && color ? (
+      {/* Centro: Peça Selecionada ou Multi-seleção */}
+      {selectedCount > 1 ? (
+        <div className="flex items-center gap-2 bg-[#22222a] px-2 py-0.5 rounded border border-amber-500/40 text-amber-300">
+          <Layers size={12} className="text-amber-400" />
+          <span className="font-semibold">{selectedCount} peças selecionadas</span>
+          {partDef && (
+            <span className="text-zinc-400 font-mono text-[10px]">
+              (Ativa: {partDef.name})
+            </span>
+          )}
+        </div>
+      ) : selectedBrick && partDef && color ? (
         <div className="flex items-center gap-2 bg-[#22222a] px-2 py-0.5 rounded border border-[#353542] text-amber-300">
           <div
             className="w-2.5 h-2.5 rounded-full border border-white/20"
@@ -68,7 +84,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({ stats, selectedBrick, engi
         </div>
       ) : (
         <div className="text-zinc-500 italic">
-          Nenhuma peça selecionada (clique em qualquer face para selecionar)
+          Nenhuma peça selecionada (clique para selecionar • Ctrl+Clique para multi-seleção)
         </div>
       )}
 

@@ -2,13 +2,11 @@ import React from 'react';
 import {
   Box,
   Download,
-  Plus,
   Undo2,
   Redo2,
 } from 'lucide-react';
 
 interface TopNavBarProps {
-  onAddBrick2x4: () => void;
   onExportLDraw: () => void;
   activeWorkspace: string;
   onSelectWorkspace: (ws: string) => void;
@@ -16,10 +14,10 @@ interface TopNavBarProps {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
+  onOpenPartsTab?: () => void;
 }
 
 export const TopNavBar: React.FC<TopNavBarProps> = ({
-  onAddBrick2x4,
   onExportLDraw,
   activeWorkspace,
   onSelectWorkspace,
@@ -27,6 +25,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   canRedo = false,
   onUndo,
   onRedo,
+  onOpenPartsTab,
 }) => {
   return (
     <header className="h-10 bg-[#1e1e24] border-b border-[#32323a] px-3 flex items-center justify-between text-xs text-zinc-300 select-none z-20">
@@ -81,7 +80,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             Edit
           </button>
           <button
-            onClick={onAddBrick2x4}
+            onClick={onOpenPartsTab}
             className="px-2 py-1 rounded hover:bg-zinc-800 hover:text-amber-400 transition-colors flex items-center gap-1"
           >
             Add
@@ -120,15 +119,6 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
 
       {/* Lado Direito: Ações Rápidas */}
       <div className="flex items-center gap-2">
-        <button
-          onClick={onAddBrick2x4}
-          className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-500 text-white font-medium px-2.5 py-1 rounded text-xs transition-colors shadow-sm"
-          title="Inserir Bloco 2x4 na mesa de montagem"
-        >
-          <Plus size={14} />
-          <span>+ Bloco 2x4</span>
-        </button>
-
         <button
           onClick={onExportLDraw}
           className="flex items-center gap-1.5 bg-[#2b2c35] hover:bg-[#383944] text-zinc-200 border border-[#444552] font-medium px-2.5 py-1 rounded text-xs transition-colors shadow-sm"

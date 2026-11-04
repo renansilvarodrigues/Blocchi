@@ -5,7 +5,15 @@ import { RightSidebar } from './components/ui/RightSidebar';
 import { StatusBar } from './components/ui/StatusBar';
 import { ViewportHeader } from './components/viewport/ViewportHeader';
 import { ViewportCanvas } from './components/viewport/ViewportCanvas';
-import type { PlacedBrick, ViewportSettings, ToolMode, LDrawColor, LegoPartDefinition } from './types/lego';
+import type {
+  PlacedBrick,
+  ViewportSettings,
+  ToolMode,
+  SelectionSubMode,
+  LDrawColor,
+  LegoPartDefinition,
+  ActivePlacement,
+} from './types/lego';
 import { LEGO_PARTS_CATALOG } from './ldraw/partsData';
 import { getLDrawColor } from './ldraw/colors';
 import { exportModelToLDraw, downloadLDrawFile } from './ldraw/exportLDraw';
@@ -13,7 +21,6 @@ import {
   STUD_SPACING,
   PLATE_HEIGHT,
   calculateLDrawStudSnap,
-  calculateStudAttachment,
   snapToUnderlyingStuds,
 } from './ldraw/proceduralBricks';
 import { X, Copy, Download, Code } from 'lucide-react';
@@ -35,9 +42,17 @@ export function App() {
   const [past, setPast] = useState<PlacedBrick[][]>([]);
   const [future, setFuture] = useState<PlacedBrick[][]>([]);
 
-  const [selectedBrickId, setSelectedBrickId] = useState<string | null>('brick_init_3001');
+  // Estado de Seleção Múltipla
+  const [selectedBrickIds, setSelectedBrickIds] = useState<string[]>(['brick_init_3001']);
+  const selectedBrickId = selectedBrickIds[selectedBrickIds.length - 1] || null;
+
   const [activeColorCode, setActiveColorCode] = useState<number>(4);
   const [activeTool, setActiveTool] = useState<ToolMode>('move');
+  const [selectionSubMode, setSelectionSubMode] = useState<SelectionSubMode>('click');
+
+  // Modo de Posicionamento Flutuante no Cursor (Inserção, Duplicação, Reposicionamento Livre - Estilo Bricklink Studio)
+  const [activePlacement, setActivePlacement] = useState<ActivePlacement | null>(null);
+
   const [activeSidebarTab, setActiveSidebarTab] = useState<'parts' | 'colors' | 'inspector'>('parts');
   const [activeWorkspace, setActiveWorkspace] = useState<string>('Montagem');
   const [engineMode, setEngineMode] = useState<'procedural' | 'ldraw'>('procedural');
@@ -60,15 +75,17 @@ export function App() {
   });
 
   // Função central para cometer alterações no estado com gravação no histórico
-  const commitBricks = useCallback((updater: PlacedBrick[] | ((prev: PlacedBrick[]) => PlacedBrick[])) => {
-    setBricks((current) => {
-      const next = typeof updater === 'function' ? updater(current) : updater;
-      // Salvar estado atual no passado (limite de 50 ações) e limpar futuro
-      setPast((p) => [...p.slice(-49), current]);
-      setFuture([]);
-      return next;
-    });
-  }, []);
+  const commitBricks = useCallback(
+    (updater: PlacedBrick[] | ((prev: PlacedBrick[]) => PlacedBrick[])) => {
+      setBricks((current) => {
+        const next = typeof updater === 'function' ? updater(current) : updater;
+        setPast((p) => [...p.slice(-49), current]);
+        setFuture([]);
+        return next;
+      });
+    },
+    []
+  );
 
   // Desfazer (Undo)
   const handleUndo = useCallback(() => {
@@ -82,13 +99,11 @@ export function App() {
         return previous;
       });
 
-      setSelectedBrickId((curId) =>
-        curId && previous.some((b) => b.instanceId === curId)
-          ? curId
-          : previous.length > 0
-          ? previous[previous.length - 1].instanceId
-          : null
-      );
+      setSelectedBrickIds((curIds) => {
+        const valid = curIds.filter((id) => previous.some((b) => b.instanceId === id));
+        if (valid.length > 0) return valid;
+        return previous.length > 0 ? [previous[previous.length - 1].instanceId] : [];
+      });
 
       return newPast;
     });
@@ -106,13 +121,11 @@ export function App() {
         return next;
       });
 
-      setSelectedBrickId((curId) =>
-        curId && next.some((b) => b.instanceId === curId)
-          ? curId
-          : next.length > 0
-          ? next[next.length - 1].instanceId
-          : null
-      );
+      setSelectedBrickIds((curIds) => {
+        const valid = curIds.filter((id) => next.some((b) => b.instanceId === id));
+        if (valid.length > 0) return valid;
+        return next.length > 0 ? [next[next.length - 1].instanceId] : [];
+      });
 
       return newFuture;
     });
@@ -120,6 +133,73 @@ export function App() {
 
   const activeColor = getLDrawColor(activeColorCode);
   const selectedBrick = bricks.find((b) => b.instanceId === selectedBrickId) || null;
+  const selectedBrickPartDef = selectedBrick
+    ? LEGO_PARTS_CATALOG.find((p) => p.id === selectedBrick.partId)
+    : null;
+
+  // Gerenciamento de Seleção por Clique e Multi-Seleção com Ctrl
+  const handleSelectBrick = useCallback(
+    (id: string | null, isMultiSelect: boolean = false) => {
+      if (!id) {
+        if (!isMultiSelect) {
+          setSelectedBrickIds([]);
+        }
+        return;
+      }
+
+      if (isMultiSelect) {
+        setSelectedBrickIds((prev) =>
+          prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+        );
+      } else {
+        setSelectedBrickIds([id]);
+      }
+    },
+    []
+  );
+
+  // Seleção em Área / Caixa de Seleção (Marquee Box)
+  const handleBoxSelect = useCallback(
+    (ids: string[], isMultiSelect: boolean = false) => {
+      if (isMultiSelect) {
+        setSelectedBrickIds((prev) => Array.from(new Set([...prev, ...ids])));
+      } else {
+        setSelectedBrickIds(ids);
+      }
+    },
+    []
+  );
+
+  // 1. Seleção por Mesma Cor
+  const handleSelectByColor = useCallback(() => {
+    if (!selectedBrick) return;
+    const targetColor = selectedBrick.colorCode;
+    const matching = bricks
+      .filter((b) => b.colorCode === targetColor)
+      .map((b) => b.instanceId);
+    setSelectedBrickIds(matching);
+  }, [selectedBrick, bricks]);
+
+  // 2. Seleção por Mesmo Modelo de Peça (LDraw ID)
+  const handleSelectByPart = useCallback(() => {
+    if (!selectedBrick) return;
+    const targetPartId = selectedBrick.partId;
+    const matching = bricks
+      .filter((b) => b.partId === targetPartId)
+      .map((b) => b.instanceId);
+    setSelectedBrickIds(matching);
+  }, [selectedBrick, bricks]);
+
+  // 3. Seleção por Mesmo Modelo e Mesma Cor
+  const handleSelectByPartAndColor = useCallback(() => {
+    if (!selectedBrick) return;
+    const targetColor = selectedBrick.colorCode;
+    const targetPartId = selectedBrick.partId;
+    const matching = bricks
+      .filter((b) => b.partId === targetPartId && b.colorCode === targetColor)
+      .map((b) => b.instanceId);
+    setSelectedBrickIds(matching);
+  }, [selectedBrick, bricks]);
 
   // Atualização direta de posição e rotação via TransformControls 3D no Canvas
   const handleUpdateBrickTransform = useCallback(
@@ -131,183 +211,213 @@ export function App() {
     [commitBricks]
   );
 
-  // Inserir nova peça com snap oficial aos pinos da peça selecionada ou à mesa
-  const handleAddPart = useCallback(
+  // Atualização múltipla sincronizada de transformações (Multi-seleção)
+  const handleUpdateMultipleBricksTransform = useCallback(
+    (
+      updates: Array<{
+        id: string;
+        position: [number, number, number];
+        rotation: [number, number, number];
+      }>
+    ) => {
+      commitBricks((prev) =>
+        prev.map((b) => {
+          const u = updates.find((item) => item.id === b.instanceId);
+          return u ? { ...b, position: u.position, rotation: u.rotation } : b;
+        })
+      );
+    },
+    [commitBricks]
+  );
+
+  // Iniciar modo de inserção a partir do catálogo lateral (peça gruda no cursor)
+  const handleStartPlacement = useCallback(
     (part: LegoPartDefinition) => {
-      const selected = bricks.find((b) => b.instanceId === selectedBrickId);
-      let newPosition: [number, number, number];
-      let newRotation: [number, number, number] = [0, 0, 0];
+      setActivePlacement({
+        mode: 'insert',
+        partDef: part,
+        colorCode: activeColorCode,
+        initialRotation: [0, 0, 0],
+      });
+    },
+    [activeColorCode]
+  );
 
-      if (selected) {
-        const selectedDef =
-          LEGO_PARTS_CATALOG.find((p) => p.id === selected.partId) || LEGO_PARTS_CATALOG[0];
-        newRotation = [...selected.rotation];
+  // Iniciar duplicação de peça com comportamento de colagem ao cursor do mouse
+  const handleDuplicateSelected = useCallback(() => {
+    if (selectedBrickIds.length === 0) return;
+    const targetBrick =
+      bricks.find((b) => b.instanceId === selectedBrickId) ||
+      bricks.find((b) => selectedBrickIds.includes(b.instanceId));
+    if (!targetBrick) return;
 
-        if (viewportSettings.studSnapping) {
-          // Encaixe perfeito e inteligente diretamente nos pinos da peça selecionada
-          newPosition = calculateStudAttachment(selected, selectedDef, part, newRotation[1]);
-        } else {
-          const selHeight = selectedDef.dimensions.heightPlates * PLATE_HEIGHT;
-          newPosition = [
-            selected.position[0],
-            selected.position[1] + selHeight,
-            selected.position[2],
-          ];
-        }
+    const targetDef =
+      LEGO_PARTS_CATALOG.find((p) => p.id === targetBrick.partId) ||
+      LEGO_PARTS_CATALOG[0];
+
+    setActivePlacement({
+      mode: 'duplicate',
+      partDef: targetDef,
+      colorCode: targetBrick.colorCode,
+      initialRotation: targetBrick.rotation,
+    });
+  }, [bricks, selectedBrickId, selectedBrickIds]);
+
+  // Iniciar reposicionamento livre ao clicar no losango central do gizmo TransformControls
+  const handleStartReposition = useCallback((brick: PlacedBrick) => {
+    const targetDef =
+      LEGO_PARTS_CATALOG.find((p) => p.id === brick.partId) ||
+      LEGO_PARTS_CATALOG[0];
+
+    setActivePlacement({
+      mode: 'reposition',
+      partDef: targetDef,
+      colorCode: brick.colorCode,
+      initialRotation: brick.rotation,
+      repositionBrickId: brick.instanceId,
+      originalPosition: brick.position,
+      originalRotation: brick.rotation,
+    });
+  }, []);
+
+  // Confirmar posicionamento da peça na viewport (para inserção, duplicação ou reposicionamento)
+  const handleConfirmPlacement = useCallback(
+    (position: [number, number, number], rotation: [number, number, number]) => {
+      if (!activePlacement) return;
+
+      if (activePlacement.mode === 'reposition' && activePlacement.repositionBrickId) {
+        // Atualiza a posição definitiva da peça existente e grava no histórico Undo/Redo
+        commitBricks((prev) =>
+          prev.map((b) =>
+            b.instanceId === activePlacement.repositionBrickId
+              ? { ...b, position, rotation }
+              : b
+          )
+        );
+        setSelectedBrickIds([activePlacement.repositionBrickId]);
       } else {
-        let targetZ = 0;
-        for (const b of bricks) {
-          if (b.position[1] < 0.1 && Math.abs(b.position[0]) < 0.5) {
-            const bDef = LEGO_PARTS_CATALOG.find((p) => p.id === b.partId);
-            const bLen = (bDef?.dimensions.studsZ || 4) * STUD_SPACING;
-            targetZ = Math.max(targetZ, b.position[2] + bLen + STUD_SPACING);
+        // Modo inserção de catálogo ou duplicação: cria uma nova peça e adiciona ao estado
+        const newBrick: PlacedBrick = {
+          instanceId: `brick_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          partId: activePlacement.partDef.id,
+          name: activePlacement.partDef.name,
+          colorCode: activePlacement.colorCode,
+          position,
+          rotation,
+        };
+
+        commitBricks((prev) => [...prev, newBrick]);
+        setSelectedBrickIds([newBrick.instanceId]);
+      }
+
+      setActivePlacement(null);
+    },
+    [activePlacement, commitBricks]
+  );
+
+  // Cancelar modo de inserção / duplicação / reposicionamento
+  const handleCancelPlacement = useCallback(() => {
+    setActivePlacement(null);
+  }, []);
+
+  // Encaixar rigorosamente aos pinos inferiores ou mesa (Snap to Studs) para selecionadas
+  const handleSnapSelectedToStuds = useCallback(() => {
+    if (selectedBrickIds.length === 0) return;
+
+    commitBricks((prev) => {
+      let updated = [...prev];
+
+      for (const curId of selectedBrickIds) {
+        const current = updated.find((b) => b.instanceId === curId);
+        if (!current) continue;
+        const currentDef = LEGO_PARTS_CATALOG.find((p) => p.id === current.partId);
+        if (!currentDef) continue;
+
+        const curHalfW = (currentDef.dimensions.studsX * STUD_SPACING) / 2;
+        const curHalfL = (currentDef.dimensions.studsZ * STUD_SPACING) / 2;
+
+        let bestUnderlying: { brick: PlacedBrick; def: LegoPartDefinition; topY: number } | null =
+          null;
+
+        for (const other of updated) {
+          if (other.instanceId === current.instanceId) continue;
+          const otherDef = LEGO_PARTS_CATALOG.find((p) => p.id === other.partId);
+          if (!otherDef) continue;
+          const otherHalfW = (otherDef.dimensions.studsX * STUD_SPACING) / 2;
+          const otherHalfL = (otherDef.dimensions.studsZ * STUD_SPACING) / 2;
+          const otherHeight = otherDef.dimensions.heightPlates * PLATE_HEIGHT;
+          const topSurface = other.position[1] + otherHeight;
+
+          const overlapX =
+            Math.abs(current.position[0] - other.position[0]) < curHalfW + otherHalfW + 0.2;
+          const overlapZ =
+            Math.abs(current.position[2] - other.position[2]) < curHalfL + otherHalfL + 0.2;
+
+          if (overlapX && overlapZ && topSurface <= current.position[1] + 0.5) {
+            if (!bestUnderlying || topSurface > bestUnderlying.topY) {
+              bestUnderlying = { brick: other, def: otherDef, topY: topSurface };
+            }
           }
         }
 
-        const rawPos: [number, number, number] = [0, 0, targetZ];
-        newPosition = viewportSettings.studSnapping
-          ? calculateLDrawStudSnap(rawPos, part, 0)
-          : rawPos;
-      }
-
-      const newBrick: PlacedBrick = {
-        instanceId: `brick_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        partId: part.id,
-        name: part.name,
-        colorCode: activeColorCode,
-        position: newPosition,
-        rotation: newRotation,
-      };
-
-      commitBricks((prev) => [...prev, newBrick]);
-      setSelectedBrickId(newBrick.instanceId);
-    },
-    [bricks, selectedBrickId, activeColorCode, viewportSettings.studSnapping, commitBricks]
-  );
-
-  // Inserir rapidamente um Bloco 2x4
-  const handleAddBrick2x4 = useCallback(() => {
-    const part2x4 = LEGO_PARTS_CATALOG.find((p) => p.id === '3001') || LEGO_PARTS_CATALOG[0];
-    handleAddPart(part2x4);
-  }, [handleAddPart]);
-
-  // Encaixar rigorosamente aos pinos inferiores ou mesa (Snap to Studs)
-  const handleSnapSelectedToStuds = useCallback(() => {
-    if (!selectedBrickId) return;
-    const current = bricks.find((b) => b.instanceId === selectedBrickId);
-    if (!current) return;
-    const currentDef = LEGO_PARTS_CATALOG.find((p) => p.id === current.partId);
-    if (!currentDef) return;
-
-    const curHalfW = (currentDef.dimensions.studsX * STUD_SPACING) / 2;
-    const curHalfL = (currentDef.dimensions.studsZ * STUD_SPACING) / 2;
-
-    let bestUnderlying: { brick: PlacedBrick; def: LegoPartDefinition; topY: number } | null = null;
-
-    for (const other of bricks) {
-      if (other.instanceId === current.instanceId) continue;
-      const otherDef = LEGO_PARTS_CATALOG.find((p) => p.id === other.partId);
-      if (!otherDef) continue;
-      const otherHalfW = (otherDef.dimensions.studsX * STUD_SPACING) / 2;
-      const otherHalfL = (otherDef.dimensions.studsZ * STUD_SPACING) / 2;
-      const otherHeight = otherDef.dimensions.heightPlates * PLATE_HEIGHT;
-      const topSurface = other.position[1] + otherHeight;
-
-      const overlapX =
-        Math.abs(current.position[0] - other.position[0]) < curHalfW + otherHalfW + 0.2;
-      const overlapZ =
-        Math.abs(current.position[2] - other.position[2]) < curHalfL + otherHalfL + 0.2;
-
-      if (overlapX && overlapZ && topSurface <= current.position[1] + 0.5) {
-        if (!bestUnderlying || topSurface > bestUnderlying.topY) {
-          bestUnderlying = { brick: other, def: otherDef, topY: topSurface };
+        let finalPos: [number, number, number];
+        if (bestUnderlying) {
+          finalPos = snapToUnderlyingStuds(
+            current.position,
+            currentDef,
+            current.rotation[1],
+            bestUnderlying.brick,
+            bestUnderlying.def
+          );
+        } else {
+          finalPos = calculateLDrawStudSnap(current.position, currentDef, current.rotation[1]);
+          finalPos[1] = 0;
         }
+
+        updated = updated.map((b) => (b.instanceId === curId ? { ...b, position: finalPos } : b));
       }
-    }
 
-    let finalPos: [number, number, number];
-    if (bestUnderlying) {
-      finalPos = snapToUnderlyingStuds(
-        current.position,
-        currentDef,
-        current.rotation[1],
-        bestUnderlying.brick,
-        bestUnderlying.def
-      );
-    } else {
-      finalPos = calculateLDrawStudSnap(current.position, currentDef, current.rotation[1]);
-      finalPos[1] = 0; // Mesa de montagem
-    }
+      return updated;
+    });
+  }, [selectedBrickIds, commitBricks]);
 
-    commitBricks((prev) =>
-      prev.map((b) => (b.instanceId === selectedBrickId ? { ...b, position: finalPos } : b))
-    );
-  }, [bricks, selectedBrickId, commitBricks]);
-
-  // Selecionar cor
+  // Selecionar cor (aplica a todas as peças selecionadas)
   const handleSelectColor = (color: LDrawColor) => {
     setActiveColorCode(color.code);
-    if (selectedBrickId) {
+    if (selectedBrickIds.length > 0) {
       commitBricks((prev) =>
         prev.map((b) =>
-          b.instanceId === selectedBrickId ? { ...b, colorCode: color.code } : b
+          selectedBrickIds.includes(b.instanceId) ? { ...b, colorCode: color.code } : b
         )
       );
     }
   };
 
-  // Girar peça selecionada 90 graus
+  // Girar todas as peças selecionadas 90 graus
   const handleRotateSelected = useCallback(() => {
-    if (!selectedBrickId) return;
+    if (selectedBrickIds.length === 0) return;
     commitBricks((prev) =>
       prev.map((b) => {
-        if (b.instanceId === selectedBrickId) {
+        if (selectedBrickIds.includes(b.instanceId)) {
           const newRotY = (b.rotation[1] + Math.PI / 2) % (Math.PI * 2);
           return { ...b, rotation: [b.rotation[0], newRotY, b.rotation[2]] };
         }
         return b;
       })
     );
-  }, [selectedBrickId, commitBricks]);
+  }, [selectedBrickIds, commitBricks]);
 
-  // Duplicar peça selecionada
-  const handleDuplicateSelected = useCallback(() => {
-    if (!selectedBrickId) return;
-    const current = bricks.find((b) => b.instanceId === selectedBrickId);
-    if (!current) return;
-
-    const currentDef = LEGO_PARTS_CATALOG.find((p) => p.id === current.partId) || LEGO_PARTS_CATALOG[0];
-    const offset = STUD_SPACING * 2;
-    const rawPos: [number, number, number] = [
-      current.position[0] + offset,
-      current.position[1],
-      current.position[2] + offset,
-    ];
-    const position = viewportSettings.studSnapping
-      ? calculateLDrawStudSnap(rawPos, currentDef, current.rotation[1])
-      : rawPos;
-
-    const cloned: PlacedBrick = {
-      ...current,
-      instanceId: `brick_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      position,
-    };
-
-    commitBricks((prev) => [...prev, cloned]);
-    setSelectedBrickId(cloned.instanceId);
-  }, [bricks, selectedBrickId, viewportSettings.studSnapping, commitBricks]);
-
-  // Deletar peça selecionada
+  // Deletar todas as peças selecionadas
   const handleDeleteSelected = useCallback(() => {
-    if (!selectedBrickId) return;
-    commitBricks((prev) => prev.filter((b) => b.instanceId !== selectedBrickId));
-    setSelectedBrickId(null);
-  }, [selectedBrickId, commitBricks]);
+    if (selectedBrickIds.length === 0) return;
+    commitBricks((prev) => prev.filter((b) => !selectedBrickIds.includes(b.instanceId)));
+    setSelectedBrickIds([]);
+  }, [selectedBrickIds, commitBricks]);
 
   // Limpar mesa de montagem
   const handleClearAll = useCallback(() => {
     commitBricks([]);
-    setSelectedBrickId(null);
+    setSelectedBrickIds([]);
   }, [commitBricks]);
 
   // Edição interativa de posição via Inspetor
@@ -344,7 +454,7 @@ export function App() {
   // Gerenciamento completo de atalhos de teclado (Undo, Redo, Blender Shortcuts)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) {
         return;
       }
 
@@ -371,10 +481,12 @@ export function App() {
       if (e.key === 'g' || e.key === 'G') {
         setActiveTool('move');
       } else if (e.key === 'r' || e.key === 'R') {
-        if (e.shiftKey) {
-          handleRotateSelected();
-        } else {
-          setActiveTool('rotate');
+        if (!activePlacement) {
+          if (e.shiftKey) {
+            handleRotateSelected();
+          } else {
+            setActiveTool('rotate');
+          }
         }
       } else if (e.key === 's' || e.key === 'S') {
         if (!isCtrl) {
@@ -382,13 +494,20 @@ export function App() {
         }
       } else if (e.key === 'w' || e.key === 'W') {
         setActiveTool('select');
+      } else if (e.key === 'b' || e.key === 'B') {
+        setActiveTool('select');
+        setSelectionSubMode('box');
       } else if (e.key === 'Delete' || e.key === 'x' || e.key === 'X') {
         handleDeleteSelected();
       } else if ((e.key === 'd' || e.key === 'D') && e.shiftKey) {
         e.preventDefault();
         handleDuplicateSelected();
       } else if (e.key === 'Escape') {
-        setSelectedBrickId(null);
+        if (activePlacement) {
+          setActivePlacement(null);
+        } else {
+          setSelectedBrickIds([]);
+        }
       }
     };
 
@@ -401,13 +520,13 @@ export function App() {
     handleDeleteSelected,
     handleDuplicateSelected,
     handleSnapSelectedToStuds,
+    activePlacement,
   ]);
 
   return (
     <div className="flex flex-col w-screen h-screen bg-[#191a1e] text-zinc-200 overflow-hidden font-sans select-none">
       {/* 1. Barra de Navegação Superior (Menu Blender + Undo/Redo) */}
       <TopNavBar
-        onAddBrick2x4={handleAddBrick2x4}
         onExportLDraw={handleExportLDraw}
         activeWorkspace={activeWorkspace}
         onSelectWorkspace={(ws) => {
@@ -420,20 +539,29 @@ export function App() {
         canRedo={future.length > 0}
         onUndo={handleUndo}
         onRedo={handleRedo}
+        onOpenPartsTab={() => setActiveSidebarTab('parts')}
       />
 
       {/* 2. Área Central de Trabalho */}
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Barra de Ferramentas Esquerda (Blender Left Toolbar) */}
+        {/* Barra de Ferramentas Esquerda com Sub-menu da Ferramenta de Seleção */}
         <LeftToolBar
           activeTool={activeTool}
           onSelectTool={setActiveTool}
+          selectionSubMode={selectionSubMode}
+          onChangeSelectionSubMode={setSelectionSubMode}
+          onSelectByColor={handleSelectByColor}
+          onSelectByPart={handleSelectByPart}
+          onSelectByPartAndColor={handleSelectByPartAndColor}
+          selectedBrickColorHex={activeColor.hex}
+          selectedBrickPartName={selectedBrickPartDef?.name}
           onRotateSelected={handleRotateSelected}
           onDuplicateSelected={handleDuplicateSelected}
           onDeleteSelected={handleDeleteSelected}
           onSnapToStuds={handleSnapSelectedToStuds}
           onClearAll={handleClearAll}
-          hasSelection={Boolean(selectedBrickId)}
+          hasSelection={selectedBrickIds.length > 0}
+          selectionCount={selectedBrickIds.length}
         />
 
         {/* Viewport 3D Principal */}
@@ -455,26 +583,36 @@ export function App() {
           <ViewportCanvas
             bricks={bricks}
             selectedBrickId={selectedBrickId}
-            onSelectBrick={setSelectedBrickId}
+            selectedBrickIds={selectedBrickIds}
+            onSelectBrick={handleSelectBrick}
+            onBoxSelect={handleBoxSelect}
             onUpdateBrickTransform={handleUpdateBrickTransform}
+            onUpdateMultipleBricksTransform={handleUpdateMultipleBricksTransform}
             settings={viewportSettings}
             engineMode={engineMode}
             activeTool={activeTool}
+            selectionSubMode={selectionSubMode}
             onStatsUpdate={setStats}
+            activePlacement={activePlacement}
+            onConfirmPlacement={handleConfirmPlacement}
+            onCancelPlacement={handleCancelPlacement}
+            onStartReposition={handleStartReposition}
           />
         </div>
 
-        {/* Barra Lateral Direita (Peças, Cores LDraw, Inspetor) */}
+        {/* Barra Lateral Direita (Peças com Seletor CAD, Cores LDraw, Inspetor) */}
         <RightSidebar
           activeTab={activeSidebarTab}
           onChangeTab={setActiveSidebarTab}
-          onAddPart={handleAddPart}
+          onAddPart={handleStartPlacement}
+          placingPartId={activePlacement?.partDef.id}
           activeColorCode={activeColorCode}
           activeColorHex={activeColor.hex}
           onSelectColor={handleSelectColor}
           bricks={bricks}
           selectedBrickId={selectedBrickId}
-          onSelectBrick={setSelectedBrickId}
+          selectedBrickIds={selectedBrickIds}
+          onSelectBrick={handleSelectBrick}
           onSetPosition={handleSetPosition}
           onSetRotation={handleSetRotation}
           onRotateSelected={handleRotateSelected}
@@ -484,10 +622,11 @@ export function App() {
         />
       </div>
 
-      {/* 3. Barra de Status Inferior (Atalhos Blender, Status da Peça, Triângulos) */}
+      {/* 3. Barra de Status Inferior (Atalhos Blender, Status das Peças, Triângulos) */}
       <StatusBar
         stats={stats}
         selectedBrick={selectedBrick}
+        selectedCount={selectedBrickIds.length}
         engineMode={engineMode}
       />
 

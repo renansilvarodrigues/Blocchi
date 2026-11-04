@@ -9,12 +9,14 @@ interface RightSidebarProps {
   activeTab: 'parts' | 'colors' | 'inspector';
   onChangeTab: (tab: 'parts' | 'colors' | 'inspector') => void;
   onAddPart: (part: LegoPartDefinition) => void;
+  placingPartId?: string | null;
   activeColorCode: number;
   activeColorHex: string;
   onSelectColor: (color: LDrawColor) => void;
   bricks: PlacedBrick[];
   selectedBrickId: string | null;
-  onSelectBrick: (id: string | null) => void;
+  selectedBrickIds?: string[];
+  onSelectBrick: (id: string | null, isMultiSelect?: boolean) => void;
   onSetPosition: (id: string, position: [number, number, number]) => void;
   onSetRotation: (id: string, rotation: [number, number, number]) => void;
   onRotateSelected: () => void;
@@ -27,11 +29,13 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   activeTab,
   onChangeTab,
   onAddPart,
+  placingPartId = null,
   activeColorCode,
   activeColorHex,
   onSelectColor,
   bricks,
   selectedBrickId,
+  selectedBrickIds = [],
   onSelectBrick,
   onSetPosition,
   onSetRotation,
@@ -140,19 +144,24 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
       {/* Conteúdo da Aba */}
       <div className="flex-1 overflow-hidden">
         {activeTab === 'parts' && (
-          <PartsCatalog onAddPart={onAddPart} activeColorHex={activeColorHex} />
+          <PartsCatalog
+            onAddPart={onAddPart}
+            activeColorHex={activeColorHex}
+            placingPartId={placingPartId}
+          />
         )}
         {activeTab === 'colors' && (
           <ColorPalette
             selectedColorCode={activeColorCode}
             onSelectColor={onSelectColor}
-            hasSelection={Boolean(selectedBrickId)}
+            hasSelection={Boolean(selectedBrickId || selectedBrickIds.length > 0)}
           />
         )}
         {activeTab === 'inspector' && (
           <SceneInspector
             bricks={bricks}
             selectedBrickId={selectedBrickId}
+            selectedBrickIds={selectedBrickIds}
             onSelectBrick={onSelectBrick}
             onSetPosition={onSetPosition}
             onSetRotation={onSetRotation}
