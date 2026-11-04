@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, Copy, RotateCw, Code, Magnet } from 'lucide-react';
+import { Trash2, Copy, RotateCw, Code, Magnet, Layers } from 'lucide-react';
 import type { PlacedBrick, LegoPartDefinition, LDrawColor } from '../../types/lego';
 import { getLDrawColor } from '../../ldraw/colors';
 import { LEGO_PARTS_CATALOG } from '../../ldraw/partsData';
@@ -8,7 +8,8 @@ import { PLATE_HEIGHT, HALF_STUD } from '../../ldraw/proceduralBricks';
 interface SceneInspectorProps {
   bricks: PlacedBrick[];
   selectedBrickId: string | null;
-  onSelectBrick: (id: string | null) => void;
+  selectedBrickIds?: string[];
+  onSelectBrick: (id: string | null, isMultiSelect?: boolean) => void;
   onSetPosition: (id: string, position: [number, number, number]) => void;
   onSetRotation: (id: string, rotation: [number, number, number]) => void;
   onRotateSelected: () => void;
@@ -40,7 +41,6 @@ const SelectedBrickEditor: React.FC<SelectedBrickEditorProps> = ({
   onDeleteSelected,
   onSnapToStuds,
 }) => {
-  // Inicialização direta a partir dos valores da peça
   const [posX, setPosX] = useState(selectedBrick.position[0].toFixed(2));
   const [posY, setPosY] = useState(selectedBrick.position[1].toFixed(2));
   const [posZ, setPosZ] = useState(selectedBrick.position[2].toFixed(2));
@@ -335,10 +335,10 @@ const SelectedBrickEditor: React.FC<SelectedBrickEditorProps> = ({
           <button
             onClick={onSnapToStuds}
             className="flex-1 bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 border border-amber-500/40 py-1.5 rounded flex items-center justify-center gap-1 transition-colors font-medium shadow-sm"
-            title="Encaixar e alinhar perfeitamente aos pinos ou mesa"
+            title="Encaixar e alinhar perfeitamente aos pinos ou mesa (S)"
           >
             <Magnet size={13} />
-            <span>Encaixar Pinos (S)</span>
+            <span>Encaixar (S)</span>
           </button>
         )}
         <button
@@ -383,6 +383,7 @@ const SelectedBrickEditor: React.FC<SelectedBrickEditorProps> = ({
 export const SceneInspector: React.FC<SceneInspectorProps> = ({
   bricks,
   selectedBrickId,
+  selectedBrickIds = [],
   onSelectBrick,
   onSetPosition,
   onSetRotation,
@@ -397,9 +398,52 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
     : null;
   const color = selectedBrick ? getLDrawColor(selectedBrick.colorCode) : null;
 
+  const multiCount = selectedBrickIds.length;
+
   return (
     <div className="flex flex-col h-full text-xs">
-      {/* Seção da Peça Selecionada com chave dinâmica baseada no transform para sincronia sem warnings */}
+      {/* Banner de Múltipla Seleção quando > 1 peça */}
+      {multiCount > 1 && (
+        <div className="p-3 bg-gradient-to-r from-amber-950/40 to-[#232330] border-b border-amber-500/30 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-amber-300 font-semibold text-xs">
+              <Layers size={14} className="text-amber-400" />
+              <span>Multi-seleção Ativa</span>
+            </div>
+            <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded text-[10px] font-mono font-medium">
+              {multiCount} peças selecionadas
+            </span>
+          </div>
+
+          <div className="flex gap-1.5 pt-1">
+            <button
+              onClick={onRotateSelected}
+              className="flex-1 bg-[#2b2b38] hover:bg-[#363646] text-zinc-200 py-1 rounded text-[11px] flex items-center justify-center gap-1 transition-colors"
+              title="Girar todas as peças selecionadas 90° (R)"
+            >
+              <RotateCw size={12} />
+              <span>Girar Todas</span>
+            </button>
+            <button
+              onClick={onDuplicateSelected}
+              className="flex-1 bg-[#2b2b38] hover:bg-[#363646] text-zinc-200 py-1 rounded text-[11px] flex items-center justify-center gap-1 transition-colors"
+              title="Duplicar todas as peças selecionadas (Shift+D)"
+            >
+              <Copy size={12} />
+              <span>Duplicar</span>
+            </button>
+            <button
+              onClick={onDeleteSelected}
+              className="bg-rose-950/70 hover:bg-rose-900 text-rose-300 px-2 py-1 rounded text-[11px] flex items-center justify-center transition-colors"
+              title="Deletar todas as peças selecionadas (Del / X)"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Seção da Peça Ativa/Primária Selecionada */}
       {selectedBrick && partDef && color ? (
         <SelectedBrickEditor
           key={`${selectedBrick.instanceId}_${selectedBrick.position.join('_')}_${selectedBrick.rotation.join('_')}`}
@@ -418,7 +462,7 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
           Nenhuma peça selecionada na mesa.
           <br />
           <span className="text-[11px] text-zinc-400">
-            Clique em qualquer face de uma peça de Lego na viewport para inspecionar e editar suas propriedades.
+            Clique em qualquer peça na viewport para inspecionar. Mantenha <strong>Ctrl</strong> pressionado para selecionar múltiplas peças.
           </span>
         </div>
       )}
@@ -429,34 +473,48 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
           <span className="font-bold text-zinc-400 uppercase tracking-wider text-[10px]">
             Outliner de Peças ({bricks.length})
           </span>
+          <span className="text-[10px] text-zinc-500 font-mono">
+            Ctrl+Clique para multi-seleção
+          </span>
         </div>
 
         <div className="space-y-1">
           {bricks.map((brick, idx) => {
-            const isSelected = brick.instanceId === selectedBrickId;
+            const isSelected = selectedBrickIds.includes(brick.instanceId) || brick.instanceId === selectedBrickId;
+            const isPrimary = brick.instanceId === selectedBrickId;
             const bColor = getLDrawColor(brick.colorCode);
             const bDef = LEGO_PARTS_CATALOG.find((p) => p.id === brick.partId);
 
             return (
               <div
                 key={brick.instanceId}
-                onClick={() => onSelectBrick(brick.instanceId)}
+                onClick={(e) => onSelectBrick(brick.instanceId, e.ctrlKey || e.metaKey)}
                 className={`p-2 rounded-md flex items-center justify-between cursor-pointer transition-all border ${
-                  isSelected
-                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-200'
+                  isPrimary
+                    ? 'bg-amber-500/20 border-amber-500/60 text-amber-200 shadow-sm'
+                    : isSelected
+                    ? 'bg-sky-500/15 border-sky-500/40 text-sky-200'
                     : 'bg-[#1e1e24] hover:bg-[#25252e] border-[#2e2e38] text-zinc-300'
                 }`}
+                title="Clique para selecionar (Ctrl+Clique para adicionar/remover)"
               >
                 <div className="flex items-center gap-2">
                   <div
-                    className="w-3.5 h-3.5 rounded-full border border-white/20"
+                    className="w-3.5 h-3.5 rounded-full border border-white/20 shrink-0"
                     style={{ backgroundColor: bColor.hex }}
                   />
                   <span className="font-medium text-xs">
                     {bDef?.name || `Brick #${brick.partId}`}
                   </span>
                 </div>
-                <span className="text-[10px] font-mono text-zinc-500">#{idx + 1}</span>
+                <div className="flex items-center gap-1.5">
+                  {isPrimary && (
+                    <span className="text-[9px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1 rounded font-mono">
+                      ativa
+                    </span>
+                  )}
+                  <span className="text-[10px] font-mono text-zinc-500">#{idx + 1}</span>
+                </div>
               </div>
             );
           })}
