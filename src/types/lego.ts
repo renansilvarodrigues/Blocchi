@@ -2,6 +2,8 @@ export type ShadingMode = 'wireframe' | 'solid' | 'material' | 'rendered';
 
 export type ToolMode = 'select' | 'move' | 'rotate' | 'duplicate' | 'delete';
 
+export type SelectionSubMode = 'click' | 'box';
+
 export interface LDrawColor {
   code: number;
   name: string;
@@ -37,6 +39,16 @@ export interface PlacedBrick {
   colorCode: number;
   position: [number, number, number]; // in Three.js world units
   rotation: [number, number, number]; // Euler angles (radians)
+}
+
+export interface ActivePlacement {
+  mode: 'insert' | 'duplicate' | 'reposition';
+  partDef: LegoPartDefinition;
+  colorCode: number;
+  initialRotation?: [number, number, number];
+  repositionBrickId?: string;
+  originalPosition?: [number, number, number];
+  originalRotation?: [number, number, number];
 }
 
 export interface ViewportSettings {
