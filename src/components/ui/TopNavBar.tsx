@@ -111,10 +111,16 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
         </div>
       </div>
 
-      {/* Centro: Nome do Arquivo */}
-      <div className="hidden md:flex items-center gap-2 font-mono text-[11px] text-zinc-400 bg-[#16161a] px-3 py-1 rounded border border-[#2c2c35]">
-        <span className="text-zinc-500">Projeto:</span>
-        <span className="text-amber-400 font-medium">blocchi_model.ldr</span>
+      {/* Centro: Nome do Arquivo e Status da Biblioteca */}
+      <div className="hidden md:flex items-center gap-3">
+        <div className="flex items-center gap-2 font-mono text-[11px] text-zinc-400 bg-[#16161a] px-3 py-1 rounded border border-[#2c2c35]">
+          <span className="text-zinc-500">Projeto:</span>
+          <span className="text-amber-400 font-medium">blocchi_model.ldr</span>
+        </div>
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-[10px] text-emerald-400 font-mono">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span>LDraw Library Online</span>
+        </div>
       </div>
 
       {/* Lado Direito: Ações Rápidas */}

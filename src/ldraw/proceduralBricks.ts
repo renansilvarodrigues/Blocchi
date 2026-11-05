@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { LegoPartDefinition, PlacedBrick } from '../types/lego';
 import { getLDrawColor } from './colors';
+import { createFlexibleHoseMesh, createFlexibleChainMesh } from './flexibleParts';
 
 // Escala Oficial LDraw:
 // 1 LDU = 0.04 unidades do Three.js (0.4mm em Three.js = 0.04)
@@ -16,6 +17,8 @@ export const STUD_SPACING = 20 * LDU_SCALE; // 0.8 (espaçamento entre pinos: 20
 export const HALF_STUD = 10 * LDU_SCALE; // 0.4 (meio pino / sub-grid modular: 10 LDU)
 export const BRICK_HEIGHT = 24 * LDU_SCALE; // 0.96 (altura de um tijolo padrão)
 export const PLATE_HEIGHT = 8 * LDU_SCALE; // 0.32 (altura de uma placa)
+export const TECHNIC_HOLE_HEIGHT = 12 * LDU_SCALE; // 0.48 (altura dos furos laterais Technic)
+export const TECHNIC_HOLE_RADIUS = 4 * LDU_SCALE; // 0.16 (raio dos furos laterais Technic)
 
 // Dimensões internas reais de acoplamento LDraw
 export const WALL_THICKNESS = 3.2 * LDU_SCALE; // 0.128
@@ -33,6 +36,25 @@ export function createBrickMesh(
   colorCode: number,
   wireframe: boolean = false
 ): THREE.Group {
+  // 1. Suporte a Peças Flexíveis (Mangueiras e Correntes)
+  if (part.isFlexible) {
+    const length = (part.dimensions.studsZ || 6) * STUD_SPACING;
+    const startPt = new THREE.Vector3(0, 0, -length / 2);
+    const endPt = new THREE.Vector3(0, 0, length / 2);
+
+    if (part.id === '30104' || part.name.toLowerCase().includes('chain')) {
+      const chainGroup = createFlexibleChainMesh(startPt, endPt, colorCode);
+      chainGroup.name = `lego_part_${part.id}`;
+      chainGroup.userData = { partId: part.id, colorCode, isFlexible: true };
+      return chainGroup;
+    } else {
+      const hoseGroup = createFlexibleHoseMesh(startPt, endPt, colorCode);
+      hoseGroup.name = `lego_part_${part.id}`;
+      hoseGroup.userData = { partId: part.id, colorCode, isFlexible: true };
+      return hoseGroup;
+    }
+  }
+
   const group = new THREE.Group();
   group.name = `lego_part_${part.id}`;
   group.userData = { partId: part.id, colorCode };
@@ -66,12 +88,11 @@ export function createBrickMesh(
   const height = heightPlates * PLATE_HEIGHT; // Y
   const length = studsZ * STUD_SPACING; // Z
 
+  // 2. Baseplates
   if (part.category === 'Baseplates') {
     const baseGeo = new THREE.BoxGeometry(width, height, length);
     baseGeo.translate(0, height / 2, 0);
     baseGeo.computeVertexNormals();
-    baseGeo.computeBoundingBox();
-    baseGeo.computeBoundingSphere();
 
     const baseMesh = new THREE.Mesh(baseGeo, plasticMaterial);
     baseMesh.castShadow = true;
@@ -81,49 +102,112 @@ export function createBrickMesh(
     const edges = new THREE.LineSegments(new THREE.EdgesGeometry(baseGeo, 20), edgesMat);
     edges.name = 'edge_lines';
     group.add(edges);
-  } else if (part.category === 'Rounds') {
+  }
+  // 3. Peças Cilíndricas / Rounds (Snap Centralizado Universal)
+  else if (part.category === 'Rounds') {
     const radius = Math.min(width, length) / 2;
-    const roundGeo = new THREE.CylinderGeometry(radius, radius, height, 24);
-    roundGeo.translate(0, height / 2, 0);
-    roundGeo.computeVertexNormals();
-    roundGeo.computeBoundingBox();
-    roundGeo.computeBoundingSphere();
 
-    const roundMesh = new THREE.Mesh(roundGeo, plasticMaterial);
-    roundMesh.castShadow = true;
-    roundMesh.receiveShadow = true;
-    group.add(roundMesh);
+    if (part.name.toLowerCase().includes('cone')) {
+      const coneGeo = new THREE.CylinderGeometry(STUD_RADIUS, radius, height, 24);
+      coneGeo.translate(0, height / 2, 0);
+      coneGeo.computeVertexNormals();
+      const coneMesh = new THREE.Mesh(coneGeo, plasticMaterial);
+      coneMesh.castShadow = true;
+      coneMesh.receiveShadow = true;
+      group.add(coneMesh);
 
-    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(roundGeo, 25), edgesMat);
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(coneGeo, 25), edgesMat);
+      edges.name = 'edge_lines';
+      group.add(edges);
+    } else {
+      const roundGeo = new THREE.CylinderGeometry(radius, radius, height, 24);
+      roundGeo.translate(0, height / 2, 0);
+      roundGeo.computeVertexNormals();
+
+      const roundMesh = new THREE.Mesh(roundGeo, plasticMaterial);
+      roundMesh.castShadow = true;
+      roundMesh.receiveShadow = true;
+      group.add(roundMesh);
+
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(roundGeo, 25), edgesMat);
+      edges.name = 'edge_lines';
+      group.add(edges);
+    }
+  }
+  // 4. Slopes & Inverted Slopes (Rampas)
+  else if (part.category === 'Slopes') {
+    if (part.isInvertedSlope) {
+      // Rampa Invertida: corte inclinado na base, topo plano retangular com pinos
+      const invShape = new THREE.Shape();
+      invShape.moveTo(-length / 2, height);
+      invShape.lineTo(length / 2, height);
+      invShape.lineTo(length / 2, 0);
+      invShape.lineTo(-length / 2, height - PLATE_HEIGHT);
+      invShape.closePath();
+
+      const invGeo = new THREE.ExtrudeGeometry(invShape, { depth: width, bevelEnabled: false });
+      invGeo.rotateY(Math.PI / 2);
+      invGeo.translate(-width / 2, 0, 0);
+      invGeo.computeVertexNormals();
+
+      const invMesh = new THREE.Mesh(invGeo, plasticMaterial);
+      invMesh.castShadow = true;
+      invMesh.receiveShadow = true;
+      group.add(invMesh);
+
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(invGeo, 25), edgesMat);
+      edges.name = 'edge_lines';
+      group.add(edges);
+    } else {
+      // Rampa Normal 45° / 33° / 31°: base plana, rampa descendo para a frente
+      const slopeShape = new THREE.Shape();
+      slopeShape.moveTo(-length / 2, 0);
+      slopeShape.lineTo(length / 2, 0);
+      slopeShape.lineTo(length / 2, height);
+      // Se for rampa de 2 studs (como 3039), topo tem 1 stud plano
+      if (studsZ >= 2) {
+        slopeShape.lineTo(0, height);
+      }
+      slopeShape.lineTo(-length / 2, 0);
+      slopeShape.closePath();
+
+      const slopeGeo = new THREE.ExtrudeGeometry(slopeShape, {
+        depth: width,
+        bevelEnabled: false,
+      });
+      slopeGeo.rotateY(Math.PI / 2);
+      slopeGeo.translate(-width / 2, 0, 0);
+      slopeGeo.computeVertexNormals();
+
+      const slopeMesh = new THREE.Mesh(slopeGeo, plasticMaterial);
+      slopeMesh.castShadow = true;
+      slopeMesh.receiveShadow = true;
+      group.add(slopeMesh);
+
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(slopeGeo, 25), edgesMat);
+      edges.name = 'edge_lines';
+      group.add(edges);
+    }
+  }
+  // 5. Technic Pins (Conectores Cilíndricos)
+  else if (part.category === 'Technic' && (part.id === '2780' || part.id === '3673' || part.id === '6558' || part.id === '32054')) {
+    const pinLen = length;
+    const pinGeo = new THREE.CylinderGeometry(TECHNIC_HOLE_RADIUS * 0.96, TECHNIC_HOLE_RADIUS * 0.96, pinLen, 16);
+    pinGeo.rotateX(Math.PI / 2);
+    pinGeo.translate(0, TECHNIC_HOLE_HEIGHT, 0);
+    pinGeo.computeVertexNormals();
+
+    const pinMesh = new THREE.Mesh(pinGeo, plasticMaterial);
+    pinMesh.castShadow = true;
+    pinMesh.receiveShadow = true;
+    group.add(pinMesh);
+
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(pinGeo, 25), edgesMat);
     edges.name = 'edge_lines';
     group.add(edges);
-  } else if (part.category === 'Slopes') {
-    const slopeShape = new THREE.Shape();
-    slopeShape.moveTo(-length / 2, 0);
-    slopeShape.lineTo(length / 2, 0);
-    slopeShape.lineTo(length / 2, height);
-    slopeShape.lineTo(-length / 2, 0);
-    slopeShape.closePath();
-
-    const slopeGeo = new THREE.ExtrudeGeometry(slopeShape, {
-      depth: width,
-      bevelEnabled: false,
-    });
-    slopeGeo.rotateY(Math.PI / 2);
-    slopeGeo.translate(-width / 2, 0, 0);
-    slopeGeo.computeVertexNormals();
-    slopeGeo.computeBoundingBox();
-    slopeGeo.computeBoundingSphere();
-
-    const slopeMesh = new THREE.Mesh(slopeGeo, plasticMaterial);
-    slopeMesh.castShadow = true;
-    slopeMesh.receiveShadow = true;
-    group.add(slopeMesh);
-
-    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(slopeGeo, 25), edgesMat);
-    edges.name = 'edge_lines';
-    group.add(edges);
-  } else {
+  }
+  // 6. Bricks, Plates, Tiles, Technic Bricks, Panels, Minifig
+  else {
     const topThickness = Math.min(TOP_CEILING_THICKNESS, height * 0.3);
     const cavityHeight = height - topThickness;
     const wallThick = Math.min(WALL_THICKNESS, width * 0.2, length * 0.2);
@@ -153,8 +237,6 @@ export function createBrickMesh(
     });
     wallsGeo.rotateX(-Math.PI / 2);
     wallsGeo.computeVertexNormals();
-    wallsGeo.computeBoundingBox();
-    wallsGeo.computeBoundingSphere();
 
     const wallsMesh = new THREE.Mesh(wallsGeo, plasticMaterial);
     wallsMesh.castShadow = true;
@@ -168,8 +250,6 @@ export function createBrickMesh(
     const roofGeo = new THREE.BoxGeometry(width, topThickness, length);
     roofGeo.translate(0, cavityHeight + topThickness / 2, 0);
     roofGeo.computeVertexNormals();
-    roofGeo.computeBoundingBox();
-    roofGeo.computeBoundingSphere();
 
     const roofMesh = new THREE.Mesh(roofGeo, plasticMaterial);
     roofMesh.castShadow = true;
@@ -180,6 +260,7 @@ export function createBrickMesh(
     roofEdges.name = 'edge_lines';
     group.add(roofEdges);
 
+    // Tubos inferiores para peças 2xN
     if (studsX >= 2 && studsZ >= 2) {
       const tubeCountZ = studsZ - 1;
       const tubeCountX = studsX - 1;
@@ -197,8 +278,6 @@ export function createBrickMesh(
       });
       tubeGeo.rotateX(-Math.PI / 2);
       tubeGeo.computeVertexNormals();
-      tubeGeo.computeBoundingBox();
-      tubeGeo.computeBoundingSphere();
       const tubeEdgesGeo = new THREE.EdgesGeometry(tubeGeo, 25);
 
       const startX = -((tubeCountX - 1) * STUD_SPACING) / 2;
@@ -221,45 +300,33 @@ export function createBrickMesh(
           group.add(tubeEdges);
         }
       }
-    } else if ((studsX === 1 && studsZ >= 2) || (studsZ === 1 && studsX >= 2)) {
-      const count = Math.max(studsX, studsZ) - 1;
-      const isAlongZ = studsZ > studsX;
+    }
 
-      const pinGeo = new THREE.CylinderGeometry(PIN_RADIUS, PIN_RADIUS, cavityHeight, 16);
-      pinGeo.translate(0, cavityHeight / 2, 0);
-      pinGeo.computeVertexNormals();
-      pinGeo.computeBoundingBox();
-      pinGeo.computeBoundingSphere();
-      const pinEdgesGeo = new THREE.EdgesGeometry(pinGeo, 25);
+    // Furos laterais Technic (se for bloco Technic com furos)
+    if (part.category === 'Technic' && (part.id === '3700' || part.id === '3701' || part.id === '3894' || part.id === '3702')) {
+      const holes = getTechnicBrickHoles(part);
+      const holeMeshGeo = new THREE.CylinderGeometry(TECHNIC_HOLE_RADIUS, TECHNIC_HOLE_RADIUS, width * 1.02, 16);
+      holeMeshGeo.rotateZ(Math.PI / 2);
 
-      const startOffset = -((count - 1) * STUD_SPACING) / 2;
+      const holeInnerMat = new THREE.MeshPhysicalMaterial({
+        color: new THREE.Color('#101014'),
+        roughness: 0.5,
+        side: THREE.DoubleSide,
+      });
 
-      for (let i = 0; i < count; i++) {
-        const offset = startOffset + i * STUD_SPACING;
-        const posX = isAlongZ ? 0 : offset;
-        const posZ = isAlongZ ? offset : 0;
-
-        const pinMesh = new THREE.Mesh(pinGeo, plasticMaterial);
-        pinMesh.position.set(posX, 0, posZ);
-        pinMesh.castShadow = true;
-        pinMesh.receiveShadow = true;
-        group.add(pinMesh);
-
-        const pinEdges = new THREE.LineSegments(pinEdgesGeo, edgesMat);
-        pinEdges.position.set(posX, 0, posZ);
-        pinEdges.name = 'edge_lines';
-        group.add(pinEdges);
+      for (const h of holes) {
+        const hMesh = new THREE.Mesh(holeMeshGeo, holeInnerMat);
+        hMesh.position.set(0, h.y, h.z);
+        group.add(hMesh);
       }
     }
   }
 
-  // 5. Pinos superiores (Studs)
+  // 7. Pinos superiores (Studs)
   if (part.hasStuds) {
     const studGeo = new THREE.CylinderGeometry(STUD_RADIUS, STUD_RADIUS, STUD_HEIGHT, 24);
     studGeo.translate(0, height + STUD_HEIGHT / 2, 0);
     studGeo.computeVertexNormals();
-    studGeo.computeBoundingBox();
-    studGeo.computeBoundingSphere();
     const studEdgesGeo = new THREE.EdgesGeometry(studGeo, 30);
 
     if (part.category === 'Rounds' && studsX === 1 && studsZ === 1) {
@@ -273,6 +340,25 @@ export function createBrickMesh(
       studLine.position.set(0, 0, 0);
       studLine.name = 'edge_lines';
       group.add(studLine);
+    } else if (part.category === 'Slopes') {
+      // Em rampas (Slopes), pinos só ficam no platô superior (não descem pela rampa)
+      if (studsZ >= 2) {
+        const startX = -((studsX - 1) * STUD_SPACING) / 2;
+        const topZ = length / 4; // Platô superior posterior
+        for (let x = 0; x < studsX; x++) {
+          const posX = startX + x * STUD_SPACING;
+          const studMesh = new THREE.Mesh(studGeo, plasticMaterial);
+          studMesh.position.set(posX, 0, topZ);
+          studMesh.castShadow = true;
+          studMesh.receiveShadow = true;
+          group.add(studMesh);
+
+          const studLine = new THREE.LineSegments(studEdgesGeo, edgesMat);
+          studLine.position.set(posX, 0, topZ);
+          studLine.name = 'edge_lines';
+          group.add(studLine);
+        }
+      }
     } else {
       const startX = -((studsX - 1) * STUD_SPACING) / 2;
       const startZ = -((studsZ - 1) * STUD_SPACING) / 2;
@@ -301,6 +387,37 @@ export function createBrickMesh(
 }
 
 /**
+ * Retorna as coordenadas locais [x, y, z] dos furos laterais de uma peça Technic
+ */
+export function getTechnicBrickHoles(part: LegoPartDefinition): Array<{ x: number; y: number; z: number }> {
+  if (part.category !== 'Technic') return [];
+  const holes: Array<{ x: number; y: number; z: number }> = [];
+  const holeY = TECHNIC_HOLE_HEIGHT;
+
+  if (part.id === '3700') {
+    // 1x2 com 1 furo
+    holes.push({ x: 0, y: holeY, z: 0 });
+  } else if (part.id === '3701') {
+    // 1x4 com 3 furos
+    holes.push({ x: 0, y: holeY, z: -STUD_SPACING });
+    holes.push({ x: 0, y: holeY, z: 0 });
+    holes.push({ x: 0, y: holeY, z: STUD_SPACING });
+  } else if (part.id === '3894') {
+    // 1x6 com 5 furos
+    for (let i = -2; i <= 2; i++) {
+      holes.push({ x: 0, y: holeY, z: i * STUD_SPACING });
+    }
+  } else if (part.id === '3702') {
+    // 1x8 com 7 furos
+    for (let i = -3; i <= 3; i++) {
+      holes.push({ x: 0, y: holeY, z: i * STUD_SPACING });
+    }
+  }
+
+  return holes;
+}
+
+/**
  * Retorna as dimensões efetivas em pinos ao longo de X e Z levando em conta rotação de 90°
  */
 export function getEffectiveStudDimensions(
@@ -324,6 +441,26 @@ export function getBrickStudWorldCoords(
   brick: PlacedBrick,
   partDef: LegoPartDefinition
 ): Array<[number, number]> {
+  // Se for peça Round 1x1, tem pino único centralizado
+  if (partDef.category === 'Rounds' && partDef.dimensions.studsX === 1 && partDef.dimensions.studsZ === 1) {
+    return [[brick.position[0], brick.position[2]]];
+  }
+
+  // Se for rampa / slope, pinos ficam restritos ao topo horizontal
+  if (partDef.category === 'Slopes') {
+    if (!partDef.hasStuds) return [];
+    const { effX } = getEffectiveStudDimensions(partDef, brick.rotation[1]);
+    const startX = brick.position[0] - ((effX - 1) * STUD_SPACING) / 2;
+    const studs: Array<[number, number]> = [];
+    for (let ix = 0; ix < effX; ix++) {
+      studs.push([
+        Math.round((startX + ix * STUD_SPACING) * 1000) / 1000,
+        Math.round(brick.position[2] * 1000) / 1000,
+      ]);
+    }
+    return studs;
+  }
+
   const { effX, effZ } = getEffectiveStudDimensions(partDef, brick.rotation[1]);
   const startX = brick.position[0] - ((effX - 1) * STUD_SPACING) / 2;
   const startZ = brick.position[2] - ((effZ - 1) * STUD_SPACING) / 2;
@@ -341,7 +478,7 @@ export function getBrickStudWorldCoords(
 }
 
 /**
- * Calcula a posição de encaixe perfeito aos pinos da peça inferior (Smart Magnet Stud Snap)
+ * Calcula a posição de encaixe aos pinos inferiores ou furos laterais Technic
  */
 export function snapToUnderlyingStuds(
   pos: [number, number, number],
@@ -353,12 +490,70 @@ export function snapToUnderlyingStuds(
   const underHeight = underlyingDef.dimensions.heightPlates * PLATE_HEIGHT;
   const targetY = underlyingBrick.position[1] + underHeight;
 
-  // Se a peça de baixo não tiver pinos (ex: Tile), apoia apenas na altura Y
+  // 1. Suporte especial para Technic: pinos encaixando em furos laterais
+  const isTechnicPin =
+    partDef.category === 'Technic' &&
+    (partDef.id === '2780' || partDef.id === '3673' || partDef.id === '6558');
+  const isTechnicBrick =
+    underlyingDef.category === 'Technic' &&
+    (underlyingDef.id === '3700' || underlyingDef.id === '3701' || underlyingDef.id === '3894' || underlyingDef.id === '3702');
+
+  if (isTechnicPin && isTechnicBrick) {
+    const holes = getTechnicBrickHoles(underlyingDef);
+    let bestHole = holes[0];
+    let minHoleDist = Infinity;
+
+    for (const h of holes) {
+      // Converter coordenada do furo para mundo
+      const holeWorldX = underlyingBrick.position[0] + h.x;
+      const holeWorldY = underlyingBrick.position[1] + h.y;
+      const holeWorldZ = underlyingBrick.position[2] + h.z;
+
+      const dist = Math.hypot(holeWorldX - pos[0], holeWorldY - pos[1], holeWorldZ - pos[2]);
+      if (dist < minHoleDist) {
+        minHoleDist = dist;
+        bestHole = h;
+      }
+    }
+
+    if (bestHole && minHoleDist < 0.8) {
+      return [
+        underlyingBrick.position[0] + bestHole.x,
+        underlyingBrick.position[1] + bestHole.y,
+        underlyingBrick.position[2] + bestHole.z,
+      ];
+    }
+  }
+
+  // 2. Se a peça de baixo não tiver pinos (ex: Tile ou Slope liso), assenta apenas na altura Y plana
   if (!underlyingDef.hasStuds) {
     return [
       Math.round(pos[0] / HALF_STUD) * HALF_STUD,
       targetY,
       Math.round(pos[2] / HALF_STUD) * HALF_STUD,
+    ];
+  }
+
+  // 3. Peças Round (Cilíndricas) 1x1: Snap centralizado exato no eixo do pino
+  if (partDef.category === 'Rounds' && partDef.dimensions.studsX === 1 && partDef.dimensions.studsZ === 1) {
+    const underStuds = getBrickStudWorldCoords(underlyingBrick, underlyingDef);
+    let bestX = underStuds[0]?.[0] ?? pos[0];
+    let bestZ = underStuds[0]?.[1] ?? pos[2];
+    let minDistance = Infinity;
+
+    for (const [uX, uZ] of underStuds) {
+      const dist = Math.hypot(uX - pos[0], uZ - pos[2]);
+      if (dist < minDistance) {
+        minDistance = dist;
+        bestX = uX;
+        bestZ = uZ;
+      }
+    }
+
+    return [
+      Math.round(bestX * 1000) / 1000,
+      Math.round(targetY * 1000) / 1000,
+      Math.round(bestZ * 1000) / 1000,
     ];
   }
 
@@ -405,57 +600,25 @@ export function snapToUnderlyingStuds(
 }
 
 /**
- * Calcula a posição de encaixe imediato ao inserir uma nova peça sobre a peça selecionada
- */
-export function calculateStudAttachment(
-  selectedBrick: PlacedBrick,
-  selectedDef: LegoPartDefinition,
-  newPart: LegoPartDefinition,
-  newRotY: number = 0
-): [number, number, number] {
-  const selHeight = selectedDef.dimensions.heightPlates * PLATE_HEIGHT;
-  const targetY = selectedBrick.position[1] + selHeight;
-
-  if (!selectedDef.hasStuds) {
-    return [selectedBrick.position[0], targetY, selectedBrick.position[2]];
-  }
-
-  const { effX: selEffX, effZ: selEffZ } = getEffectiveStudDimensions(selectedDef, selectedBrick.rotation[1]);
-  const { effX: newEffX, effZ: newEffZ } = getEffectiveStudDimensions(newPart, newRotY);
-
-  // Alinhamento inteligente de paridade (par vs ímpar)
-  let attachX = selectedBrick.position[0];
-  if (selEffX % 2 !== newEffX % 2) {
-    // Paridade diferente (ex: 1x1 sobre 2x4): desloca 0.4 para alinhar ao pino mais próximo
-    attachX = selectedBrick.position[0] - HALF_STUD;
-  }
-
-  let attachZ = selectedBrick.position[2];
-  if (selEffZ % 2 !== newEffZ % 2) {
-    // Paridade diferente em Z: desloca 0.4 para coincidir com o pino
-    attachZ = selectedBrick.position[2] - HALF_STUD;
-  }
-
-  return [
-    Math.round(attachX * 1000) / 1000,
-    Math.round(targetY * 1000) / 1000,
-    Math.round(attachZ * 1000) / 1000,
-  ];
-}
-
-/**
  * Calcula a posição exata alinhada ao sub-grid modular oficial LDraw (10 LDU = 0.4 unidades = meio stud)
  * viabilizando o encaixe de qualquer combinação de peças pares e ímpares.
  */
 export function calculateLDrawStudSnap(
   pos: [number, number, number],
-  _part?: LegoPartDefinition,
+  part?: LegoPartDefinition,
   _rotY: number = 0
 ): [number, number, number] {
-  // Grid de 0.4 (10 LDU) permite que peças 1x1, 1x2, 2x4, etc. caiam perfeitamente sobre os pinos
+  // Para peças Round 1x1 no chão, alinha centralizado aos pinos
   const step = HALF_STUD; // 0.4
-  const snappedX = Math.round(pos[0] / step) * step;
-  const snappedZ = Math.round(pos[2] / step) * step;
+  let snappedX = Math.round(pos[0] / step) * step;
+  let snappedZ = Math.round(pos[2] / step) * step;
+
+  if (part && part.category === 'Rounds' && part.dimensions.studsX === 1 && part.dimensions.studsZ === 1) {
+    // Alinhamento exato no centro do grid de pinos
+    snappedX = Math.round(pos[0] / STUD_SPACING) * STUD_SPACING;
+    snappedZ = Math.round(pos[2] / STUD_SPACING) * STUD_SPACING;
+  }
+
   const snappedY = Math.max(0, Math.round(pos[1] / PLATE_HEIGHT) * PLATE_HEIGHT);
 
   return [

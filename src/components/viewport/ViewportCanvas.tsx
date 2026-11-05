@@ -505,12 +505,19 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
     };
   }, []);
 
-  // Configuração dos controles de mouse de acordo com o modo de seleção
+  // Configuração dos controles de mouse de acordo com o modo de seleção e inserção
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls) return;
 
-    if (selectionSubMode === 'box') {
+    if (activePlacement) {
+      // No modo de inserção/reposicionamento flutuante, botão esquerdo fixa a peça na cena
+      controls.mouseButtons = {
+        LEFT: -1 as unknown as THREE.MOUSE,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: THREE.MOUSE.ROTATE,
+      };
+    } else if (selectionSubMode === 'box') {
       controls.mouseButtons = {
         LEFT: -1 as unknown as THREE.MOUSE,
         MIDDLE: THREE.MOUSE.DOLLY,
@@ -523,7 +530,7 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
         RIGHT: THREE.MOUSE.PAN,
       };
     }
-  }, [selectionSubMode]);
+  }, [selectionSubMode, activePlacement]);
 
   // Atualizar modo e configurações do TransformControls
   useEffect(() => {

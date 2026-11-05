@@ -8,7 +8,8 @@ import { LDU_SCALE } from './proceduralBricks';
 let cachedLoader: LDrawLoader | null = null;
 
 /**
- * Obtém ou inicializa o LDrawLoader configurado com materiais condicionais e cores oficiais
+ * Obtém ou inicializa o LDrawLoader configurado com materiais condicionais,
+ * cores oficiais e caminho da biblioteca /ldraw/
  */
 export function getInitializedLDrawLoader(): LDrawLoader {
   if (cachedLoader) return cachedLoader;
@@ -16,6 +17,11 @@ export function getInitializedLDrawLoader(): LDrawLoader {
   const loader = new LDrawLoader();
   loader.setConditionalLineMaterial(LDrawConditionalLineMaterial);
   loader.addDefaultMaterials();
+
+  // Configurar caminho base da biblioteca LDraw (/p/ e /parts/)
+  const baseUrl = import.meta.env.BASE_URL || '/';
+  const ldrawPath = baseUrl.endsWith('/') ? `${baseUrl}ldraw/` : `${baseUrl}/ldraw/`;
+  loader.setPartsLibraryPath(ldrawPath);
 
   // Registrar todas as cores oficiais Lego via diretivas !COLOUR
   const ldConfigColors = generateLDConfigDirectives();
@@ -38,54 +44,75 @@ export function getInitializedLDrawLoader(): LDrawLoader {
 
 /**
  * Carrega e converte uma peça LDraw para um THREE.Group pronto para a cena
+ * com fallback inteligente para gerador procedural
  */
-export function loadLDrawPart(
+export async function loadLDrawPart(
   partId: string,
   colorCode: number = 4
 ): Promise<THREE.Group> {
-  return new Promise((resolve, reject) => {
-    const part = LEGO_PARTS_CATALOG.find(p => p.id === partId);
-    if (!part) {
-      reject(new Error(`Peça LDraw ${partId} não encontrada no catálogo.`));
-      return;
-    }
+  const part = LEGO_PARTS_CATALOG.find((p) => p.id === partId);
+  if (!part) {
+    throw new Error(`Peça LDraw ${partId} não encontrada no catálogo.`);
+  }
 
-    const loader = getInitializedLDrawLoader();
-    const ldrawSource = generateLDrawSource(part, colorCode);
+  const loader = getInitializedLDrawLoader();
+  const baseUrl = import.meta.env.BASE_URL || '/';
+  const ldrawPath = baseUrl.endsWith('/') ? `${baseUrl}ldraw/` : `${baseUrl}/ldraw/`;
 
-    loader.parse(
-      ldrawSource,
+  // Tentar carregar diretamente o arquivo oficial .dat da biblioteca
+  return new Promise((resolve) => {
+    const fileUrl = `${ldrawPath}parts/${part.id}.dat`;
+
+    loader.load(
+      fileUrl,
       (group: THREE.Group) => {
-        // Ajustar orientação do padrão LDraw para o padrão Three.js:
-        // No LDraw, -Y é para cima. Invertemos Y e aplicamos a escala LDU_SCALE.
-        const wrapper = new THREE.Group();
-        wrapper.name = `ldraw_${part.id}_${colorCode}`;
-
-        group.rotation.x = Math.PI; // Inverte Y do LDraw para coincidir com o mundo Three.js (+Y para cima)
-        group.scale.set(LDU_SCALE, LDU_SCALE, LDU_SCALE);
-
-        // Habilitar sombras e materiais
-        group.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            const mesh = child as THREE.Mesh;
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-          }
-        });
-
-        wrapper.add(group);
-        wrapper.userData = {
-          partId: part.id,
-          colorCode: colorCode,
-          isLDrawNative: true,
-        };
-
+        const wrapper = finalizeLoadedGroup(group, part.id, colorCode);
         resolve(wrapper);
       },
-      (error: unknown) => {
-        console.error('Erro ao processar LDraw:', error);
-        reject(error);
+      undefined,
+      (err) => {
+        console.warn(`[LDrawLoader] Não foi possível carregar ${fileUrl}, usando gerador embutido:`, err);
+        // Fallback: parsear código LDraw gerado proceduralmente
+        const ldrawSource = generateLDrawSource(part, colorCode);
+        loader.parse(
+          ldrawSource,
+          (group: THREE.Group) => {
+            const wrapper = finalizeLoadedGroup(group, part.id, colorCode);
+            resolve(wrapper);
+          },
+          (parseErr) => {
+            console.error('Falha no fallback LDraw:', parseErr);
+            throw parseErr;
+          }
+        );
       }
     );
   });
+}
+
+function finalizeLoadedGroup(group: THREE.Group, partId: string, colorCode: number): THREE.Group {
+  const wrapper = new THREE.Group();
+  wrapper.name = `ldraw_${partId}_${colorCode}`;
+
+  // No LDraw, -Y é para cima. Invertemos Y e aplicamos a escala LDU_SCALE
+  group.rotation.x = Math.PI;
+  group.scale.set(LDU_SCALE, LDU_SCALE, LDU_SCALE);
+
+  // Habilitar projeção e recepção de sombras
+  group.traverse((child) => {
+    if ((child as THREE.Mesh).isMesh) {
+      const mesh = child as THREE.Mesh;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+    }
+  });
+
+  wrapper.add(group);
+  wrapper.userData = {
+    partId: partId,
+    colorCode: colorCode,
+    isLDrawNative: true,
+  };
+
+  return wrapper;
 }

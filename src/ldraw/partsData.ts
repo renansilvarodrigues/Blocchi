@@ -110,6 +110,24 @@ export const LEGO_PARTS_CATALOG: LegoPartDefinition[] = [
     hasStuds: true,
     description: 'Tijolo de canto em L 2x2 para quinas e colunas.',
   },
+  {
+    id: '6091',
+    name: 'Brick 1 x 2 x 1 1/3 Curved Top',
+    category: 'Bricks',
+    dimensions: { studsX: 1, studsZ: 2, heightPlates: 4 },
+    lduSize: { x: 20, y: 32, z: 40 },
+    hasStuds: true,
+    description: 'Bloco 1x2 com arco superior suave.',
+  },
+  {
+    id: '3659',
+    name: 'Brick 1 x 4 Arch',
+    category: 'Bricks',
+    dimensions: { studsX: 1, studsZ: 4, heightPlates: 3 },
+    lduSize: { x: 20, y: 24, z: 80 },
+    hasStuds: true,
+    description: 'Arco clássico 1x4 para pontes e janelas.',
+  },
 
   // ==================== PLATES (Placas) ====================
   {
@@ -238,6 +256,15 @@ export const LEGO_PARTS_CATALOG: LegoPartDefinition[] = [
     hasStuds: true,
     description: 'Placa retangular 4x8.',
   },
+  {
+    id: '2420',
+    name: 'Plate 2 x 2 Corner',
+    category: 'Plates',
+    dimensions: { studsX: 2, studsZ: 2, heightPlates: 1 },
+    lduSize: { x: 40, y: 8, z: 40 },
+    hasStuds: true,
+    description: 'Placa de canto 2x2 em L.',
+  },
 
   // ==================== TILES (Ladrilhos Lisos) ====================
   {
@@ -277,6 +304,15 @@ export const LEGO_PARTS_CATALOG: LegoPartDefinition[] = [
     description: 'Ladrilho liso 1x4.',
   },
   {
+    id: '6636',
+    name: 'Tile 1 x 6 with Groove',
+    category: 'Tiles',
+    dimensions: { studsX: 1, studsZ: 6, heightPlates: 1 },
+    lduSize: { x: 20, y: 8, z: 120 },
+    hasStuds: false,
+    description: 'Ladrilho liso longo 1x6.',
+  },
+  {
     id: '3068b',
     name: 'Tile 2 x 2 with Groove',
     category: 'Tiles',
@@ -303,15 +339,17 @@ export const LEGO_PARTS_CATALOG: LegoPartDefinition[] = [
     dimensions: { studsX: 1, studsZ: 1, heightPlates: 2 },
     lduSize: { x: 20, y: 16, z: 20 },
     hasStuds: false,
+    slopeAngle: 31,
     description: 'Famosa rampa triangular Cheese Slope 1x1.',
   },
   {
-    id: '3040',
+    id: '3040b',
     name: 'Slope 45 2 x 1',
     category: 'Slopes',
     dimensions: { studsX: 1, studsZ: 2, heightPlates: 3 },
     lduSize: { x: 20, y: 24, z: 40 },
     hasStuds: true,
+    slopeAngle: 45,
     description: 'Rampa clássica inclinada a 45 graus 2x1.',
   },
   {
@@ -321,6 +359,7 @@ export const LEGO_PARTS_CATALOG: LegoPartDefinition[] = [
     dimensions: { studsX: 2, studsZ: 2, heightPlates: 3 },
     lduSize: { x: 40, y: 24, z: 40 },
     hasStuds: true,
+    slopeAngle: 45,
     description: 'Rampa de telhado padrão 45 graus 2x2.',
   },
   {
@@ -330,6 +369,7 @@ export const LEGO_PARTS_CATALOG: LegoPartDefinition[] = [
     dimensions: { studsX: 2, studsZ: 4, heightPlates: 3 },
     lduSize: { x: 40, y: 24, z: 80 },
     hasStuds: true,
+    slopeAngle: 45,
     description: 'Rampa de telhado ampla 45 graus 2x4.',
   },
   {
@@ -339,6 +379,7 @@ export const LEGO_PARTS_CATALOG: LegoPartDefinition[] = [
     dimensions: { studsX: 1, studsZ: 3, heightPlates: 3 },
     lduSize: { x: 20, y: 24, z: 60 },
     hasStuds: true,
+    slopeAngle: 33,
     description: 'Rampa suave de inclinação 33 graus 3x1.',
   },
   {
@@ -348,7 +389,50 @@ export const LEGO_PARTS_CATALOG: LegoPartDefinition[] = [
     dimensions: { studsX: 2, studsZ: 3, heightPlates: 3 },
     lduSize: { x: 40, y: 24, z: 60 },
     hasStuds: true,
+    slopeAngle: 33,
     description: 'Rampa suave 33 graus 3x2.',
+  },
+  {
+    id: '3665',
+    name: 'Slope 45 2 x 1 Inverted',
+    category: 'Slopes',
+    dimensions: { studsX: 1, studsZ: 2, heightPlates: 3 },
+    lduSize: { x: 20, y: 24, z: 40 },
+    hasStuds: true,
+    slopeAngle: 45,
+    isInvertedSlope: true,
+    description: 'Rampa invertida 45 graus 2x1 com pinos superiores e corte inferior.',
+  },
+  {
+    id: '3660',
+    name: 'Slope 45 2 x 2 Inverted',
+    category: 'Slopes',
+    dimensions: { studsX: 2, studsZ: 2, heightPlates: 3 },
+    lduSize: { x: 40, y: 24, z: 40 },
+    hasStuds: true,
+    slopeAngle: 45,
+    isInvertedSlope: true,
+    description: 'Rampa invertida 45 graus 2x2 para asas e beirais.',
+  },
+  {
+    id: '60481',
+    name: 'Slope 65 2 x 1 x 2',
+    category: 'Slopes',
+    dimensions: { studsX: 1, studsZ: 2, heightPlates: 6 },
+    lduSize: { x: 20, y: 48, z: 40 },
+    hasStuds: true,
+    slopeAngle: 65,
+    description: 'Rampa íngreme de 65 graus altura dupla.',
+  },
+  {
+    id: '85984',
+    name: 'Slope 30 1 x 2 x 2/3',
+    category: 'Slopes',
+    dimensions: { studsX: 1, studsZ: 2, heightPlates: 2 },
+    lduSize: { x: 20, y: 16, z: 40 },
+    hasStuds: false,
+    slopeAngle: 30,
+    description: 'Rampa suave 1x2 de altura 2 placas.',
   },
 
   // ==================== ROUNDS (Peças Cilíndricas) ====================
@@ -359,7 +443,7 @@ export const LEGO_PARTS_CATALOG: LegoPartDefinition[] = [
     dimensions: { studsX: 1, studsZ: 1, heightPlates: 1 },
     lduSize: { x: 20, y: 8, z: 20 },
     hasStuds: true,
-    description: 'Pino unitário redondo 1x1, luz ou detalhe.',
+    description: 'Pino unitário redondo 1x1, luz ou detalhe centralizado.',
   },
   {
     id: '3062b',
@@ -397,6 +481,253 @@ export const LEGO_PARTS_CATALOG: LegoPartDefinition[] = [
     hasStuds: false,
     description: 'Ladrilho circular 1x1 liso.',
   },
+  {
+    id: '14769',
+    name: 'Tile 2 x 2 Round',
+    category: 'Rounds',
+    dimensions: { studsX: 2, studsZ: 2, heightPlates: 1 },
+    lduSize: { x: 40, y: 8, z: 40 },
+    hasStuds: false,
+    description: 'Ladrilho circular 2x2 liso.',
+  },
+  {
+    id: '4589b',
+    name: 'Cone 1 x 1 with Top Groove',
+    category: 'Rounds',
+    dimensions: { studsX: 1, studsZ: 1, heightPlates: 3 },
+    lduSize: { x: 20, y: 24, z: 20 },
+    hasStuds: true,
+    description: 'Cone 1x1 com pino no topo.',
+  },
+  {
+    id: '3942c',
+    name: 'Cone 2 x 2 x 2 with Open Stud',
+    category: 'Rounds',
+    dimensions: { studsX: 2, studsZ: 2, heightPlates: 6 },
+    lduSize: { x: 40, y: 48, z: 40 },
+    hasStuds: true,
+    description: 'Cone grande 2x2 altura dupla.',
+  },
+  {
+    id: '3960',
+    name: 'Dish 4 x 4 Inverted (Radar)',
+    category: 'Rounds',
+    dimensions: { studsX: 4, studsZ: 4, heightPlates: 3 },
+    lduSize: { x: 80, y: 24, z: 80 },
+    hasStuds: true,
+    description: 'Antena radar parabólica 4x4.',
+  },
+
+  // ==================== TECHNIC (Vigas, Pinos, Eixos) ====================
+  {
+    id: '3700',
+    name: 'Technic Brick 1 x 2 with Hole',
+    category: 'Technic',
+    dimensions: { studsX: 1, studsZ: 2, heightPlates: 3 },
+    lduSize: { x: 20, y: 24, z: 40 },
+    hasStuds: true,
+    description: 'Bloco Technic 1x2 com orifício lateral para pinos de conexão.',
+    connectionPoints: [
+      { type: 'technic-hole', position: [0, 12, 0], direction: [1, 0, 0], radius: 4 },
+    ],
+  },
+  {
+    id: '3701',
+    name: 'Technic Brick 1 x 4 with 3 Holes',
+    category: 'Technic',
+    dimensions: { studsX: 1, studsZ: 4, heightPlates: 3 },
+    lduSize: { x: 20, y: 24, z: 80 },
+    hasStuds: true,
+    description: 'Bloco Technic estrutural 1x4 com 3 furos laterais.',
+  },
+  {
+    id: '3894',
+    name: 'Technic Brick 1 x 6 with 5 Holes',
+    category: 'Technic',
+    dimensions: { studsX: 1, studsZ: 6, heightPlates: 3 },
+    lduSize: { x: 20, y: 24, z: 120 },
+    hasStuds: true,
+    description: 'Bloco Technic estrutural 1x6 com 5 furos laterais.',
+  },
+  {
+    id: '3702',
+    name: 'Technic Brick 1 x 8 with 7 Holes',
+    category: 'Technic',
+    dimensions: { studsX: 1, studsZ: 8, heightPlates: 3 },
+    lduSize: { x: 20, y: 24, z: 160 },
+    hasStuds: true,
+    description: 'Bloco Technic estrutural 1x8 com 7 furos laterais.',
+  },
+  {
+    id: '2780',
+    name: 'Technic Pin with Friction Ridges',
+    category: 'Technic',
+    dimensions: { studsX: 1, studsZ: 2, heightPlates: 1 },
+    lduSize: { x: 10, y: 10, z: 40 },
+    hasStuds: false,
+    description: 'Pino preto de fricção Technic para conectar vigas e blocos.',
+    connectionPoints: [
+      { type: 'technic-pin', position: [0, 0, 10], direction: [0, 0, 1], radius: 4 },
+      { type: 'technic-pin', position: [0, 0, -10], direction: [0, 0, -1], radius: 4 },
+    ],
+  },
+  {
+    id: '3673',
+    name: 'Technic Pin without Friction',
+    category: 'Technic',
+    dimensions: { studsX: 1, studsZ: 2, heightPlates: 1 },
+    lduSize: { x: 10, y: 10, z: 40 },
+    hasStuds: false,
+    description: 'Pino liso cinza Technic para rotação livre.',
+  },
+  {
+    id: '6558',
+    name: 'Technic Pin Long with Friction',
+    category: 'Technic',
+    dimensions: { studsX: 1, studsZ: 3, heightPlates: 1 },
+    lduSize: { x: 10, y: 10, z: 60 },
+    hasStuds: false,
+    description: 'Pino azul longo Technic 3L.',
+  },
+  {
+    id: '32054',
+    name: 'Technic Pin 3L with Stop Bush',
+    category: 'Technic',
+    dimensions: { studsX: 1, studsZ: 3, heightPlates: 1 },
+    lduSize: { x: 10, y: 10, z: 60 },
+    hasStuds: false,
+    description: 'Pino Technic 3L com flange limitadora.',
+  },
+  {
+    id: '3705',
+    name: 'Technic Axle 4L',
+    category: 'Technic',
+    dimensions: { studsX: 1, studsZ: 4, heightPlates: 1 },
+    lduSize: { x: 10, y: 10, z: 80 },
+    hasStuds: false,
+    description: 'Eixo cruzado Technic comprimento 4.',
+  },
+  {
+    id: '3706',
+    name: 'Technic Axle 6L',
+    category: 'Technic',
+    dimensions: { studsX: 1, studsZ: 6, heightPlates: 1 },
+    lduSize: { x: 10, y: 10, z: 120 },
+    hasStuds: false,
+    description: 'Eixo cruzado Technic comprimento 6.',
+  },
+  {
+    id: '32523',
+    name: 'Technic Beam 1 x 3 Thick',
+    category: 'Technic',
+    dimensions: { studsX: 1, studsZ: 3, heightPlates: 2.5 },
+    lduSize: { x: 20, y: 20, z: 60 },
+    hasStuds: false,
+    description: 'Viga estrutural sem pinos Technic 3L.',
+  },
+  {
+    id: '32524',
+    name: 'Technic Beam 1 x 7 Thick',
+    category: 'Technic',
+    dimensions: { studsX: 1, studsZ: 7, heightPlates: 2.5 },
+    lduSize: { x: 20, y: 20, z: 140 },
+    hasStuds: false,
+    description: 'Viga estrutural sem pinos Technic 7L.',
+  },
+
+  // ==================== PANELS (Painéis & Pára-brisas) ====================
+  {
+    id: '4865',
+    name: 'Panel 1 x 2 x 1',
+    category: 'Panels',
+    dimensions: { studsX: 1, studsZ: 2, heightPlates: 3 },
+    lduSize: { x: 20, y: 24, z: 40 },
+    hasStuds: true,
+    description: 'Painel fino vertical 1x2x1 para divisórias.',
+  },
+  {
+    id: '2362a',
+    name: 'Panel 1 x 2 x 3 Hollow Studs',
+    category: 'Panels',
+    dimensions: { studsX: 1, studsZ: 2, heightPlates: 9 },
+    lduSize: { x: 20, y: 72, z: 40 },
+    hasStuds: true,
+    description: 'Painel alto 1x2x3 para paredes e frentes de cabine.',
+  },
+  {
+    id: '60581',
+    name: 'Panel 1 x 4 x 3',
+    category: 'Panels',
+    dimensions: { studsX: 1, studsZ: 4, heightPlates: 9 },
+    lduSize: { x: 20, y: 72, z: 80 },
+    hasStuds: true,
+    description: 'Painel amplo 1x4x3 para estruturas.',
+  },
+  {
+    id: '3823',
+    name: 'Windscreen 2 x 4 x 2',
+    category: 'Panels',
+    dimensions: { studsX: 2, studsZ: 4, heightPlates: 6 },
+    lduSize: { x: 40, y: 48, z: 80 },
+    hasStuds: true,
+    description: 'Pára-brisa curvo para veículos e naves.',
+  },
+  {
+    id: '3853',
+    name: 'Window 1 x 4 x 3',
+    category: 'Panels',
+    dimensions: { studsX: 1, studsZ: 4, heightPlates: 9 },
+    lduSize: { x: 20, y: 72, z: 80 },
+    hasStuds: true,
+    description: 'Moldura de janela 1x4x3.',
+  },
+
+  // ==================== MINIFIG (Minifiguras) ====================
+  {
+    id: '3626b',
+    name: 'Minifig Head Hollow Stud',
+    category: 'Minifig',
+    dimensions: { studsX: 1, studsZ: 1, heightPlates: 3.5 },
+    lduSize: { x: 20, y: 28, z: 20 },
+    hasStuds: true,
+    description: 'Cabeça clássica de minifigura Lego com pino vazado.',
+  },
+  {
+    id: '973',
+    name: 'Minifig Torso',
+    category: 'Minifig',
+    dimensions: { studsX: 1, studsZ: 2, heightPlates: 4 },
+    lduSize: { x: 20, y: 32, z: 40 },
+    hasStuds: true,
+    description: 'Torso e braços de minifigura Lego.',
+  },
+  {
+    id: '970c00',
+    name: 'Minifig Hips and Legs',
+    category: 'Minifig',
+    dimensions: { studsX: 1, studsZ: 2, heightPlates: 5 },
+    lduSize: { x: 20, y: 40, z: 40 },
+    hasStuds: false,
+    description: 'Pernas e quadril articulados de minifigura.',
+  },
+  {
+    id: '3838',
+    name: 'Minifig Air Tanks',
+    category: 'Minifig',
+    dimensions: { studsX: 1, studsZ: 1, heightPlates: 3 },
+    lduSize: { x: 20, y: 24, z: 20 },
+    hasStuds: false,
+    description: 'Tanques de oxigênio espaciais/mergulho.',
+  },
+  {
+    id: '3844',
+    name: 'Minifig Helmet Castle',
+    category: 'Minifig',
+    dimensions: { studsX: 1, studsZ: 1, heightPlates: 3 },
+    lduSize: { x: 20, y: 24, z: 20 },
+    hasStuds: false,
+    description: 'Capacete de cavaleiro clássico.',
+  },
 
   // ==================== BASEPLATES (Placas Base) ====================
   {
@@ -427,44 +758,111 @@ export const LEGO_PARTS_CATALOG: LegoPartDefinition[] = [
     description: 'Placa espessa de ancoragem 8x8.',
   },
 
-  // ==================== TECHNIC & MODIFIED ====================
-  {
-    id: '3700',
-    name: 'Technic Brick 1 x 2 with Hole',
-    category: 'Technic',
-    dimensions: { studsX: 1, studsZ: 2, heightPlates: 3 },
-    lduSize: { x: 20, y: 24, z: 40 },
-    hasStuds: true,
-    description: 'Bloco Technic 1x2 com orifício para eixos ou pinos de conexão.',
-  },
-  {
-    id: '3701',
-    name: 'Technic Brick 1 x 4 with 3 Holes',
-    category: 'Technic',
-    dimensions: { studsX: 1, studsZ: 4, heightPlates: 3 },
-    lduSize: { x: 20, y: 24, z: 80 },
-    hasStuds: true,
-    description: 'Bloco Technic estrutural 1x4 com 3 furos.',
-  },
+  // ==================== SPECIAL & FLEXIBLE ====================
   {
     id: '4070',
     name: 'Brick 1 x 1 with Headlight',
-    category: 'Technic',
+    category: 'Special',
     dimensions: { studsX: 1, studsZ: 1, heightPlates: 3 },
     lduSize: { x: 20, y: 24, z: 20 },
     hasStuds: true,
-    description: 'Bloco farol Erling 1x1 com rebaixo e pino lateral para técnicas SNOT.',
+    description: 'Bloco farol Erling 1x1 com pino frontal para técnicas SNOT.',
+  },
+  {
+    id: '4085c',
+    name: 'Plate 1 x 1 with Clip Vertical',
+    category: 'Special',
+    dimensions: { studsX: 1, studsZ: 1, heightPlates: 1 },
+    lduSize: { x: 20, y: 8, z: 20 },
+    hasStuds: true,
+    description: 'Placa 1x1 com clipe vertical para fixação de barras e mangueiras.',
+  },
+  {
+    id: '60477',
+    name: 'Plate 1 x 2 with Handle',
+    category: 'Special',
+    dimensions: { studsX: 1, studsZ: 2, heightPlates: 1 },
+    lduSize: { x: 20, y: 8, z: 40 },
+    hasStuds: true,
+    description: 'Placa 1x2 com alça lateral.',
+  },
+  {
+    id: '3937',
+    name: 'Hinge Brick 1 x 2 Base',
+    category: 'Special',
+    dimensions: { studsX: 1, studsZ: 2, heightPlates: 3 },
+    lduSize: { x: 20, y: 24, z: 40 },
+    hasStuds: true,
+    description: 'Base de dobradiça 1x2 articulada.',
+  },
+  {
+    id: '3938',
+    name: 'Hinge Brick 1 x 2 Top',
+    category: 'Special',
+    dimensions: { studsX: 1, studsZ: 2, heightPlates: 3 },
+    lduSize: { x: 20, y: 24, z: 40 },
+    hasStuds: true,
+    description: 'Topo de dobradiça 1x2 articulada.',
+  },
+  {
+    id: '3680',
+    name: 'Turntable 2 x 2 Plate Base',
+    category: 'Special',
+    dimensions: { studsX: 2, studsZ: 2, heightPlates: 1 },
+    lduSize: { x: 40, y: 8, z: 40 },
+    hasStuds: true,
+    description: 'Base de prato giratório 2x2 para rotação 360° de veículos.',
+  },
+  {
+    id: '14301',
+    name: 'Hose Flexible 11.5L',
+    category: 'Special',
+    dimensions: { studsX: 1, studsZ: 12, heightPlates: 1 },
+    lduSize: { x: 20, y: 8, z: 240 },
+    hasStuds: false,
+    isFlexible: true,
+    description: 'Mangueira plástica flexível com deformação e encaixe nas extremidades.',
+  },
+  {
+    id: '73590',
+    name: 'Hose Flexible 8.5L',
+    category: 'Special',
+    dimensions: { studsX: 1, studsZ: 9, heightPlates: 1 },
+    lduSize: { x: 20, y: 8, z: 180 },
+    hasStuds: false,
+    isFlexible: true,
+    description: 'Mangueira estriada flexível de 8.5 pinos de comprimento.',
+  },
+  {
+    id: '30104',
+    name: 'Chain 21 Links',
+    category: 'Special',
+    dimensions: { studsX: 1, studsZ: 10, heightPlates: 1 },
+    lduSize: { x: 20, y: 8, z: 200 },
+    hasStuds: false,
+    isFlexible: true,
+    description: 'Corrente articulada com 21 elos e curvatura por catenária.',
+  },
+  {
+    id: '14696',
+    name: 'Technic Chain Link Reinforced',
+    category: 'Special',
+    dimensions: { studsX: 1, studsZ: 1, heightPlates: 1 },
+    lduSize: { x: 20, y: 8, z: 20 },
+    hasStuds: false,
+    isFlexible: true,
+    description: 'Elo individual reforçado para esteiras e correntes.',
   },
 ];
 
 /**
- * Gera código LDraw completo (formato MPD autocontido) para qualquer peça definida
+ * Gera código LDraw autocontido para peças procedurais
  */
 export function generateLDrawSource(part: LegoPartDefinition, colorCode: number = 16): string {
   const { studsX, studsZ, heightPlates } = part.dimensions;
-  const width = studsX * 20; // X
-  const height = heightPlates * 8; // Y (height in LDU)
-  const length = studsZ * 20; // Z
+  const width = studsX * 20;
+  const height = heightPlates * 8;
+  const length = studsZ * 20;
 
   const hx = width / 2;
   const hz = length / 2;
@@ -481,26 +879,23 @@ export function generateLDrawSource(part: LegoPartDefinition, colorCode: number 
     '',
   ];
 
-  // Se for rampa / slope
   if (part.category === 'Slopes') {
-    // Face inferior
-    lines.push(`4 16 ${-hx} ${botY} ${-hz} ${hx} ${botY} ${-hz} ${hx} ${botY} ${hz} ${-hx} ${botY} ${hz}`);
-    // Face posterior (+Z)
-    lines.push(`4 16 ${-hx} ${botY} ${hz} ${hx} ${botY} ${hz} ${hx} ${topY} ${hz} ${-hx} ${topY} ${hz}`);
-    // Face frontal inclinada (rampa descendo para -Z)
-    lines.push(`4 16 ${-hx} ${topY} ${hz} ${hx} ${topY} ${hz} ${hx} ${botY} ${-hz} ${-hx} ${botY} ${-hz}`);
-    // Laterais triangulares
-    lines.push(`3 16 ${-hx} ${botY} ${-hz} ${-hx} ${botY} ${hz} ${-hx} ${topY} ${hz}`);
-    lines.push(`3 16 ${hx} ${botY} ${hz} ${hx} ${botY} ${-hz} ${hx} ${topY} ${hz}`);
-    // Arestas
-    lines.push(`2 24 ${-hx} ${topY} ${hz} ${hx} ${topY} ${hz}`);
-    lines.push(`2 24 ${hx} ${botY} ${-hz} ${-hx} ${botY} ${-hz}`);
-    lines.push(`2 24 ${-hx} ${topY} ${hz} ${-hx} ${botY} ${-hz}`);
-    lines.push(`2 24 ${hx} ${topY} ${hz} ${hx} ${botY} ${-hz}`);
+    if (part.isInvertedSlope) {
+      // Rampa invertida: topo reto com pinos, base recortada inclinada
+      lines.push(`4 16 ${-hx} ${topY} ${-hz} ${hx} ${topY} ${-hz} ${hx} ${topY} ${hz} ${-hx} ${topY} ${hz}`);
+      lines.push(`4 16 ${-hx} ${topY} ${hz} ${hx} ${topY} ${hz} ${hx} ${botY} ${hz} ${-hx} ${botY} ${hz}`);
+      lines.push(`4 16 ${-hx} ${botY} ${hz} ${hx} ${botY} ${hz} ${hx} ${topY + 8} ${-hz} ${-hx} ${topY + 8} ${-hz}`);
+    } else {
+      // Rampa normal
+      lines.push(`4 16 ${-hx} ${botY} ${-hz} ${hx} ${botY} ${-hz} ${hx} ${botY} ${hz} ${-hx} ${botY} ${hz}`);
+      lines.push(`4 16 ${-hx} ${botY} ${hz} ${hx} ${botY} ${hz} ${hx} ${topY} ${hz} ${-hx} ${topY} ${hz}`);
+      lines.push(`4 16 ${-hx} ${topY} ${hz} ${hx} ${topY} ${hz} ${hx} ${botY} ${-hz} ${-hx} ${botY} ${-hz}`);
+      lines.push(`3 16 ${-hx} ${botY} ${-hz} ${-hx} ${botY} ${hz} ${-hx} ${topY} ${hz}`);
+      lines.push(`3 16 ${hx} ${botY} ${hz} ${hx} ${botY} ${-hz} ${hx} ${topY} ${hz}`);
+    }
   } else if (part.category === 'Rounds') {
-    // Cilindro
     const radius = Math.min(width, length) / 2;
-    const segments = 16;
+    const segments = 24;
     for (let i = 0; i < segments; i++) {
       const a1 = (i / segments) * Math.PI * 2;
       const a2 = ((i + 1) / segments) * Math.PI * 2;
@@ -509,44 +904,19 @@ export function generateLDrawSource(part: LegoPartDefinition, colorCode: number 
       const x2 = Math.round(Math.cos(a2) * radius * 100) / 100;
       const z2 = Math.round(Math.sin(a2) * radius * 100) / 100;
 
-      // Parede lateral
       lines.push(`4 16 ${x1} ${botY} ${z1} ${x2} ${botY} ${z2} ${x2} ${topY} ${z2} ${x1} ${topY} ${z1}`);
-      // Topo
       lines.push(`3 16 0 ${topY} 0 ${x1} ${topY} ${z1} ${x2} ${topY} ${z2}`);
-      // Aresta superior
-      lines.push(`2 24 ${x1} ${topY} ${z1} ${x2} ${topY} ${z2}`);
     }
   } else {
-    // Faces externas da caixa principal (Bricks, Plates, Tiles, Baseplates)
-    // Top Face
+    // Bricks, Plates, Tiles, Baseplates, Technic, Panels, Minifig
     lines.push(`4 16 ${-hx} ${topY} ${-hz} ${hx} ${topY} ${-hz} ${hx} ${topY} ${hz} ${-hx} ${topY} ${hz}`);
-    // Front Face (+Z)
     lines.push(`4 16 ${-hx} ${botY} ${hz} ${hx} ${botY} ${hz} ${hx} ${topY} ${hz} ${-hx} ${topY} ${hz}`);
-    // Back Face (-Z)
     lines.push(`4 16 ${hx} ${botY} ${-hz} ${-hx} ${botY} ${-hz} ${-hx} ${topY} ${-hz} ${hx} ${topY} ${-hz}`);
-    // Left Face (-X)
     lines.push(`4 16 ${-hx} ${botY} ${-hz} ${-hx} ${botY} ${hz} ${-hx} ${topY} ${hz} ${-hx} ${topY} ${-hz}`);
-    // Right Face (+X)
     lines.push(`4 16 ${hx} ${botY} ${hz} ${hx} ${botY} ${-hz} ${hx} ${topY} ${-hz} ${hx} ${topY} ${hz}`);
-
-    // Linhas de aresta externas de contraste (cor 24 no padrão LDraw)
-    lines.push(`2 24 ${-hx} ${topY} ${-hz} ${hx} ${topY} ${-hz}`);
-    lines.push(`2 24 ${hx} ${topY} ${-hz} ${hx} ${topY} ${hz}`);
-    lines.push(`2 24 ${hx} ${topY} ${hz} ${-hx} ${topY} ${hz}`);
-    lines.push(`2 24 ${-hx} ${topY} ${hz} ${-hx} ${topY} ${-hz}`);
-
-    lines.push(`2 24 ${-hx} ${botY} ${-hz} ${hx} ${botY} ${-hz}`);
-    lines.push(`2 24 ${hx} ${botY} ${-hz} ${hx} ${botY} ${hz}`);
-    lines.push(`2 24 ${hx} ${botY} ${hz} ${-hx} ${botY} ${hz}`);
-    lines.push(`2 24 ${-hx} ${botY} ${hz} ${-hx} ${botY} ${-hz}`);
-
-    lines.push(`2 24 ${-hx} ${botY} ${-hz} ${-hx} ${topY} ${-hz}`);
-    lines.push(`2 24 ${hx} ${botY} ${-hz} ${hx} ${topY} ${-hz}`);
-    lines.push(`2 24 ${hx} ${botY} ${hz} ${hx} ${topY} ${hz}`);
-    lines.push(`2 24 ${-hx} ${botY} ${hz} ${-hx} ${topY} ${hz}`);
   }
 
-  // Se tiver studs, adicionar referências aos studs no topo
+  // Pinos superiores
   if (part.hasStuds) {
     if (part.category === 'Rounds') {
       if (studsX === 1 && studsZ === 1) {
@@ -567,22 +937,6 @@ export function generateLDrawSource(part: LegoPartDefinition, colorCode: number 
           const sz = -hz + 10 + zIdx * 20;
           lines.push(`1 16 ${sx} ${topY} ${sz} 1 0 0 0 1 0 0 0 1 stud.dat`);
         }
-      }
-    }
-  }
-
-  // Tubos inferiores para peças 2xN
-  if (studsX >= 2 && studsZ >= 2 && part.category !== 'Baseplates') {
-    const tubeCountX = studsX - 1;
-    const tubeCountZ = studsZ - 1;
-    const startX = -((tubeCountX - 1) * 20) / 2;
-    const startZ = -((tubeCountZ - 1) * 20) / 2;
-
-    for (let ix = 0; ix < tubeCountX; ix++) {
-      for (let iz = 0; iz < tubeCountZ; iz++) {
-        const tx = startX + ix * 20;
-        const tz = startZ + iz * 20;
-        lines.push(`1 16 ${tx} 0 ${tz} 1 0 0 0 1 0 0 0 1 tube.dat`);
       }
     }
   }
@@ -609,35 +963,9 @@ export function generateLDrawSource(part: LegoPartDefinition, colorCode: number 
 
     lines.push(`4 16 ${x1} 0 ${z1} ${x2} 0 ${z2} ${x2} ${-studH} ${z2} ${x1} ${-studH} ${z1}`);
     lines.push(`3 16 0 ${-studH} 0 ${x1} ${-studH} ${z1} ${x2} ${-studH} ${z2}`);
-    lines.push(`2 24 ${x1} ${-studH} ${z1} ${x2} ${-studH} ${z2}`);
   }
 
   lines.push('0');
-
-  // Subpart tube.dat
-  if (studsX >= 2 && studsZ >= 2 && part.category !== 'Baseplates') {
-    lines.push('0 FILE tube.dat');
-    lines.push('0 Anti-Stud Tube');
-    lines.push('0 Name: tube.dat');
-    lines.push('0 BFC CERTIFY CCW');
-
-    const tubeR = 8.14;
-    const tubeH = height - 2.5;
-
-    for (let i = 0; i < segments; i++) {
-      const a1 = (i / segments) * Math.PI * 2;
-      const a2 = ((i + 1) / segments) * Math.PI * 2;
-      const x1 = Math.round(Math.cos(a1) * tubeR * 100) / 100;
-      const z1 = Math.round(Math.sin(a1) * tubeR * 100) / 100;
-      const x2 = Math.round(Math.cos(a2) * tubeR * 100) / 100;
-      const z2 = Math.round(Math.sin(a2) * tubeR * 100) / 100;
-
-      lines.push(`4 16 ${x1} 0 ${z1} ${x2} 0 ${z2} ${x2} ${-tubeH} ${z2} ${x1} ${-tubeH} ${z1}`);
-      lines.push(`2 24 ${x1} 0 ${z1} ${x2} 0 ${z2}`);
-    }
-
-    lines.push('0');
-  }
 
   if (colorCode !== 16) {
     const rootWrapper = [

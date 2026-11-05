@@ -4,6 +4,18 @@ export type ToolMode = 'select' | 'move' | 'rotate' | 'duplicate' | 'delete';
 
 export type SelectionSubMode = 'click' | 'box';
 
+export type LegoCategory =
+  | 'Bricks'
+  | 'Plates'
+  | 'Tiles'
+  | 'Slopes'
+  | 'Technic'
+  | 'Rounds'
+  | 'Panels'
+  | 'Minifig'
+  | 'Baseplates'
+  | 'Special';
+
 export interface LDrawColor {
   code: number;
   name: string;
@@ -14,10 +26,17 @@ export interface LDrawColor {
   isTrans?: boolean;
 }
 
+export interface ConnectionPoint {
+  type: 'stud' | 'anti-stud' | 'technic-hole' | 'technic-pin' | 'flexible-anchor';
+  position: [number, number, number]; // in LDU or Three.js units
+  direction: [number, number, number]; // normal vector (e.g. [0, 1, 0] for top stud, [1, 0, 0] for side hole)
+  radius?: number;
+}
+
 export interface LegoPartDefinition {
   id: string; // e.g. "3001"
   name: string; // "Brick 2 x 4"
-  category: 'Bricks' | 'Plates' | 'Tiles' | 'Slopes' | 'Baseplates' | 'Rounds' | 'Technic';
+  category: LegoCategory;
   dimensions: {
     studsX: number;
     studsZ: number;
@@ -29,6 +48,10 @@ export interface LegoPartDefinition {
     z: number; // studsZ * 20
   };
   hasStuds: boolean;
+  isFlexible?: boolean;
+  slopeAngle?: number;
+  isInvertedSlope?: boolean;
+  connectionPoints?: ConnectionPoint[];
   description: string;
 }
 
@@ -39,6 +62,7 @@ export interface PlacedBrick {
   colorCode: number;
   position: [number, number, number]; // in Three.js world units
   rotation: [number, number, number]; // Euler angles (radians)
+  flexibleCurvePoints?: [number, number, number][]; // Pontos de controle da spline se for peça flexível
 }
 
 export interface ActivePlacement {
