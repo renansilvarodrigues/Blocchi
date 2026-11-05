@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Box, ChevronDown, MousePointerClick, Sparkles } from 'lucide-react';
+import { Search, Plus, Box, ChevronDown, MousePointerClick, Sparkles, Database } from 'lucide-react';
+import { getPartsCatalog } from '../../ldraw/partsCatalogService';
 import { LEGO_PARTS_CATALOG } from '../../ldraw/partsData';
 import type { LegoPartDefinition } from '../../types/lego';
 
@@ -31,37 +32,32 @@ export const PartsCatalog: React.FC<PartsCatalogProps> = ({
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   const [allParts, setAllParts] = useState<LegoPartDefinition[]>(LEGO_PARTS_CATALOG);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [displayLimit, setDisplayLimit] = useState<number>(40);
 
-  // Carregar catálogo indexado oficial gerado a partir do complete.zip se disponível
+  // Carregar índice oficial LDraw (parts.lst) sob demanda
   useEffect(() => {
-    const baseUrl = import.meta.env.BASE_URL || '/';
-    const jsonUrl = `${baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'}ldraw/parts-catalog.json`;
+    let isMounted = true;
 
-    fetch(jsonUrl)
-      .then((res) => {
-        if (!res.ok) return null;
-        return res.json();
-      })
-      .then((data: LegoPartDefinition[] | null) => {
-        if (data && Array.isArray(data) && data.length > 0) {
-          // Mesclar garantindo que peças curadas mantenham descrições ricas
-          const map = new Map<string, LegoPartDefinition>();
-          LEGO_PARTS_CATALOG.forEach((p) => map.set(p.id, p));
-          data.forEach((p) => {
-            if (!map.has(p.id)) {
-              map.set(p.id, p);
-            }
-          });
-          setAllParts(Array.from(map.values()));
+    getPartsCatalog()
+      .then((parts) => {
+        if (isMounted && parts.length > 0) {
+          setAllParts(parts);
         }
       })
       .catch((err) => {
-        console.warn('Usando catálogo embutido de alta fidelidade:', err);
+        console.warn('Erro ao carregar catálogo completo LDraw, mantendo base inicial:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
       });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Filtragem otimizada com useMemo
+  // Filtragem ultra-otimizada
   const filteredParts = useMemo(() => {
     const q = search.trim().toLowerCase();
     return allParts.filter((part) => {
@@ -95,7 +91,7 @@ export const PartsCatalog: React.FC<PartsCatalogProps> = ({
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
-    if (target.scrollHeight - target.scrollTop <= target.clientHeight + 120) {
+    if (target.scrollHeight - target.scrollTop <= target.clientHeight + 160) {
       if (displayLimit < filteredParts.length) {
         setDisplayLimit((prev) => Math.min(prev + 40, filteredParts.length));
       }
@@ -106,6 +102,17 @@ export const PartsCatalog: React.FC<PartsCatalogProps> = ({
     <div className="flex flex-col h-full text-xs">
       {/* Busca e Seletor de Categorias Estilizado CAD */}
       <div className="p-3 border-b border-[#303038] space-y-2.5 bg-[#1e1e24]">
+        {/* Indicador de Catálogo Oficial */}
+        <div className="flex items-center justify-between text-[10px] text-zinc-400">
+          <span className="flex items-center gap-1 text-amber-400 font-medium">
+            <Database size={11} />
+            <span>Biblioteca LDraw Oficial</span>
+          </span>
+          <span className="font-mono text-zinc-400">
+            {isLoading ? 'Carregando parts.lst...' : `${allParts.length.toLocaleString('pt-BR')} peças`}
+          </span>
+        </div>
+
         {/* Campo de Busca */}
         <div className="relative">
           <Search size={14} className="absolute left-2.5 top-2.5 text-zinc-500 pointer-events-none" />
@@ -120,12 +127,12 @@ export const PartsCatalog: React.FC<PartsCatalogProps> = ({
 
         {/* Seletor Oficial de Taxonomia LDraw */}
         <div className="space-y-1">
-          <label className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider flex items-center justify-between">
+          <div className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider flex items-center justify-between">
             <span>Categoria LDraw</span>
             <span className="font-mono text-amber-400 text-[10px]">
-              {filteredParts.length} {filteredParts.length === 1 ? 'peça' : 'peças'}
+              {filteredParts.length.toLocaleString('pt-BR')} {filteredParts.length === 1 ? 'peça' : 'peças'}
             </span>
-          </label>
+          </div>
           <div className="relative">
             <select
               value={selectedCategory}
@@ -178,9 +185,9 @@ export const PartsCatalog: React.FC<PartsCatalogProps> = ({
                     )}
                   </div>
                   <div>
-                    <h4 className="font-semibold text-zinc-200 text-xs flex items-center gap-1.5">
+                    <h4 className="font-semibold text-zinc-200 text-xs flex items-center gap-1.5 line-clamp-1">
                       {part.name}
-                      <span className="font-mono text-[10px] text-zinc-400 bg-[#191920] px-1 rounded border border-[#30303a]">
+                      <span className="font-mono text-[10px] text-zinc-400 bg-[#191920] px-1 rounded border border-[#30303a] shrink-0">
                         #{part.id}
                       </span>
                     </h4>
@@ -232,7 +239,7 @@ export const PartsCatalog: React.FC<PartsCatalogProps> = ({
           </div>
         )}
 
-        {filteredParts.length === 0 && (
+        {filteredParts.length === 0 && !isLoading && (
           <div className="text-center py-8 text-zinc-500">
             Nenhuma peça encontrada com "{search}".
           </div>

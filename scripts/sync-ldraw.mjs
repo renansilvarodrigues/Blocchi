@@ -299,8 +299,45 @@ export async function extractAndIndexLibrary() {
   }
   console.log(`[LDraw Sync] ${primitivesCount} primitivas extraídas em public/ldraw/p/.`);
 
-  // 3. Montar catálogo indexado das peças curadas + extrair dependências
-  console.log('[LDraw Sync] Extraindo e indexando peças do catálogo...');
+  // 3. Gerar arquivo de índice oficial parts.lst a partir do complete.zip
+  console.log('[LDraw Sync] Gerando arquivo de índice oficial parts.lst...');
+  const partsListLines = [];
+  let totalIndexedParts = 0;
+
+  for (const entry of entries) {
+    const normName = entry.entryName.toLowerCase();
+    // Apenas peças oficiais da pasta /parts/ (excluir subpeças /parts/s/ que não são peças finais de catálogo)
+    if (
+      normName.startsWith('ldraw/parts/') &&
+      normName.endsWith('.dat') &&
+      !normName.startsWith('ldraw/parts/s/') &&
+      !entry.isDirectory
+    ) {
+      const filename = entry.entryName.substring('ldraw/parts/'.length);
+      const data = entry.getData();
+      const firstNewline = data.indexOf(10);
+      const line1 = (firstNewline !== -1 ? data.subarray(0, firstNewline) : data)
+        .toString('utf8')
+        .trim();
+      const desc = line1.replace(/^0\s+/, '').trim();
+      if (desc) {
+        partsListLines.push(`${filename}\t${desc}`);
+        totalIndexedParts++;
+      }
+    }
+  }
+
+  partsListLines.sort((a, b) => a.localeCompare(b));
+  const partsLstPath = path.join(publicLDrawDir, 'parts.lst');
+  fs.writeFileSync(partsLstPath, partsListLines.join('\n'), 'utf8');
+  console.log(
+    `[LDraw Sync] parts.lst gerado com ${totalIndexedParts} peças oficiais (${(
+      fs.statSync(partsLstPath).size / 1024 / 1024
+    ).toFixed(2)} MB).`
+  );
+
+  // 4. Montar catálogo indexado das peças curadas + extrair dependências
+  console.log('[LDraw Sync] Extraindo e indexando peças prioritárias...');
   const catalog = [];
   const extractedParts = new Set();
 

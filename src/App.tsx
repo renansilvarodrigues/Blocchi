@@ -14,9 +14,9 @@ import type {
   LegoPartDefinition,
   ActivePlacement,
 } from './types/lego';
-import { LEGO_PARTS_CATALOG } from './ldraw/partsData';
+import { getPartDefinitionOrFallback } from './ldraw/partsCatalogService';
 import { getLDrawColor } from './ldraw/colors';
-import { exportModelToLDraw, downloadLDrawFile } from './ldraw/exportLDraw';
+import { exportModelToLDraw, importModelFromLDraw, downloadLDrawFile } from './ldraw/exportLDraw';
 import {
   STUD_SPACING,
   PLATE_HEIGHT,
@@ -55,7 +55,8 @@ export function App() {
 
   const [activeSidebarTab, setActiveSidebarTab] = useState<'parts' | 'colors' | 'inspector'>('parts');
   const [activeWorkspace, setActiveWorkspace] = useState<string>('Montagem');
-  const [engineMode, setEngineMode] = useState<'procedural' | 'ldraw'>('procedural');
+  const [engineMode, setEngineMode] = useState<'procedural' | 'ldraw'>('ldraw');
+  const [currentProjectName, setCurrentProjectName] = useState<string>('blocchi_model.ldr');
   const [showCodeModal, setShowCodeModal] = useState<boolean>(false);
   const [exportedLDrawCode, setExportedLDrawCode] = useState<string>('');
 
@@ -134,7 +135,7 @@ export function App() {
   const activeColor = getLDrawColor(activeColorCode);
   const selectedBrick = bricks.find((b) => b.instanceId === selectedBrickId) || null;
   const selectedBrickPartDef = selectedBrick
-    ? LEGO_PARTS_CATALOG.find((p) => p.id === selectedBrick.partId)
+    ? getPartDefinitionOrFallback(selectedBrick.partId)
     : null;
 
   // Gerenciamento de Seleção por Clique e Multi-Seleção com Ctrl
@@ -251,9 +252,7 @@ export function App() {
       bricks.find((b) => selectedBrickIds.includes(b.instanceId));
     if (!targetBrick) return;
 
-    const targetDef =
-      LEGO_PARTS_CATALOG.find((p) => p.id === targetBrick.partId) ||
-      LEGO_PARTS_CATALOG[0];
+    const targetDef = getPartDefinitionOrFallback(targetBrick.partId);
 
     setActivePlacement({
       mode: 'duplicate',
@@ -265,9 +264,7 @@ export function App() {
 
   // Iniciar reposicionamento livre ao clicar no losango central do gizmo TransformControls
   const handleStartReposition = useCallback((brick: PlacedBrick) => {
-    const targetDef =
-      LEGO_PARTS_CATALOG.find((p) => p.id === brick.partId) ||
-      LEGO_PARTS_CATALOG[0];
+    const targetDef = getPartDefinitionOrFallback(brick.partId);
 
     setActivePlacement({
       mode: 'reposition',
@@ -330,7 +327,7 @@ export function App() {
       for (const curId of selectedBrickIds) {
         const current = updated.find((b) => b.instanceId === curId);
         if (!current) continue;
-        const currentDef = LEGO_PARTS_CATALOG.find((p) => p.id === current.partId);
+        const currentDef = getPartDefinitionOrFallback(current.partId);
         if (!currentDef) continue;
 
         const curHalfW = (currentDef.dimensions.studsX * STUD_SPACING) / 2;
@@ -341,7 +338,7 @@ export function App() {
 
         for (const other of updated) {
           if (other.instanceId === current.instanceId) continue;
-          const otherDef = LEGO_PARTS_CATALOG.find((p) => p.id === other.partId);
+          const otherDef = getPartDefinitionOrFallback(other.partId);
           if (!otherDef) continue;
           const otherHalfW = (otherDef.dimensions.studsX * STUD_SPACING) / 2;
           const otherHalfL = (otherDef.dimensions.studsZ * STUD_SPACING) / 2;
@@ -442,13 +439,30 @@ export function App() {
 
   // Exportar LDraw
   const handleExportLDraw = () => {
-    const code = exportModelToLDraw(bricks, 'Blocchi_Lego_Model');
+    const code = exportModelToLDraw(bricks, currentProjectName.replace(/\.ldr$/i, '') || 'Blocchi_Lego_Model');
     setExportedLDrawCode(code);
     setShowCodeModal(true);
   };
 
   const handleDownloadFile = () => {
-    downloadLDrawFile(exportedLDrawCode, 'blocchi_model.ldr');
+    downloadLDrawFile(exportedLDrawCode, currentProjectName || 'blocchi_model.ldr');
+  };
+
+  // Importar LDraw (.ldr)
+  const handleImportLDraw = (content: string, filename: string) => {
+    try {
+      const imported = importModelFromLDraw(content);
+      if (imported.length === 0) {
+        console.warn('[LDraw Project] Nenhuma peça válida encontrada no arquivo LDraw.');
+        return;
+      }
+      commitBricks(imported);
+      setSelectedBrickIds([]);
+      setCurrentProjectName(filename);
+      console.log(`[LDraw Project] ${imported.length} peças importadas com sucesso de "${filename}".`);
+    } catch (err) {
+      console.error('[LDraw Project Error]', err);
+    }
   };
 
   // Gerenciamento completo de atalhos de teclado (Undo, Redo, Blender Shortcuts)
@@ -528,6 +542,8 @@ export function App() {
       {/* 1. Barra de Navegação Superior (Menu Blender + Undo/Redo) */}
       <TopNavBar
         onExportLDraw={handleExportLDraw}
+        onImportLDraw={handleImportLDraw}
+        currentProjectName={currentProjectName}
         activeWorkspace={activeWorkspace}
         onSelectWorkspace={(ws) => {
           setActiveWorkspace(ws);

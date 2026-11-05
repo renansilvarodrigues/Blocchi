@@ -2,12 +2,15 @@ import React from 'react';
 import {
   Box,
   Download,
+  FolderOpen,
   Undo2,
   Redo2,
 } from 'lucide-react';
 
 interface TopNavBarProps {
   onExportLDraw: () => void;
+  onImportLDraw?: (content: string, filename: string) => void;
+  currentProjectName?: string;
   activeWorkspace: string;
   onSelectWorkspace: (ws: string) => void;
   canUndo?: boolean;
@@ -19,6 +22,8 @@ interface TopNavBarProps {
 
 export const TopNavBar: React.FC<TopNavBarProps> = ({
   onExportLDraw,
+  onImportLDraw,
+  currentProjectName = 'blocchi_model.ldr',
   activeWorkspace,
   onSelectWorkspace,
   canUndo = false,
@@ -27,6 +32,20 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   onRedo,
   onOpenPartsTab,
 }) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (text && onImportLDraw) {
+        onImportLDraw(text, file.name);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   return (
     <header className="h-10 bg-[#1e1e24] border-b border-[#32323a] px-3 flex items-center justify-between text-xs text-zinc-300 select-none z-20">
       {/* Lado Esquerdo: Logo & Menus */}
@@ -115,7 +134,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
       <div className="hidden md:flex items-center gap-3">
         <div className="flex items-center gap-2 font-mono text-[11px] text-zinc-400 bg-[#16161a] px-3 py-1 rounded border border-[#2c2c35]">
           <span className="text-zinc-500">Projeto:</span>
-          <span className="text-amber-400 font-medium">blocchi_model.ldr</span>
+          <span className="text-amber-400 font-medium">{currentProjectName}</span>
         </div>
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-[10px] text-emerald-400 font-mono">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -125,13 +144,27 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
 
       {/* Lado Direito: Ações Rápidas */}
       <div className="flex items-center gap-2">
+        <label
+          className="flex items-center gap-1.5 bg-[#2b2c35] hover:bg-[#383944] text-zinc-200 border border-[#444552] font-medium px-2.5 py-1 rounded text-xs transition-colors shadow-sm cursor-pointer"
+          title="Abrir arquivo de projeto LDraw (.ldr, .dat, .mpd)"
+        >
+          <FolderOpen size={13} />
+          <span>Abrir .ldr</span>
+          <input
+            type="file"
+            accept=".ldr,.dat,.mpd,text/plain"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+        </label>
+
         <button
           onClick={onExportLDraw}
-          className="flex items-center gap-1.5 bg-[#2b2c35] hover:bg-[#383944] text-zinc-200 border border-[#444552] font-medium px-2.5 py-1 rounded text-xs transition-colors shadow-sm"
+          className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-500 text-white font-medium px-2.5 py-1 rounded text-xs transition-colors shadow-sm"
           title="Exportar código no formato padrão LDraw (.ldr)"
         >
           <Download size={13} />
-          <span>Exportar LDraw</span>
+          <span>Exportar .ldr</span>
         </button>
       </div>
     </header>

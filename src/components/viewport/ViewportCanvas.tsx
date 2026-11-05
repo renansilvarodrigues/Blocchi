@@ -19,8 +19,8 @@ import {
   STUD_SPACING,
   BRICK_HEIGHT,
 } from '../../ldraw/proceduralBricks';
-import { loadLDrawPart } from '../../ldraw/ldrawLoaderHelper';
-import { LEGO_PARTS_CATALOG } from '../../ldraw/partsData';
+import { loadLDrawPart, createDefaultFallbackBrick } from '../../ldraw/ldrawLoaderHelper';
+import { getPartDefinitionOrFallback } from '../../ldraw/partsCatalogService';
 
 interface ViewportCanvasProps {
   bricks: PlacedBrick[];
@@ -315,7 +315,7 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
           (b) => b.instanceId === selectedBrickIdRef.current
         );
         const partDef = currentBrick
-          ? LEGO_PARTS_CATALOG.find((p) => p.id === currentBrick.partId)
+          ? getPartDefinitionOrFallback(currentBrick.partId)
           : null;
 
         if (isYAxisDrag) {
@@ -344,7 +344,7 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
                 other.instanceId === selectedBrickIdRef.current
               )
                 continue;
-              const otherDef = LEGO_PARTS_CATALOG.find((p) => p.id === other.partId);
+              const otherDef = getPartDefinitionOrFallback(other.partId);
               if (!otherDef) continue;
 
               const otherHalfW = (otherDef.dimensions.studsX * STUD_SPACING) / 2;
@@ -583,9 +583,7 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
       let totalTriangles = 0;
 
       for (const brick of bricks) {
-        const partDef =
-          LEGO_PARTS_CATALOG.find((p) => p.id === brick.partId) ||
-          LEGO_PARTS_CATALOG[0];
+        const partDef = getPartDefinitionOrFallback(brick.partId);
 
         let brickMesh: THREE.Group;
 
@@ -593,12 +591,8 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
           try {
             brickMesh = await loadLDrawPart(brick.partId, brick.colorCode);
           } catch (e) {
-            console.warn('Falha no LDrawLoader, usando gerador procedural:', e);
-            brickMesh = createBrickMesh(
-              partDef,
-              brick.colorCode,
-              settings.shadingMode === 'wireframe'
-            );
+            console.warn('Falha no LDrawLoader, usando fallback:', e);
+            brickMesh = createDefaultFallbackBrick(brick.partId, brick.colorCode, partDef);
           }
         } else {
           brickMesh = createBrickMesh(
@@ -876,7 +870,7 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
             : null;
 
         if (hitBrick) {
-          const hitDef = LEGO_PARTS_CATALOG.find((p) => p.id === hitBrick.partId);
+          const hitDef = getPartDefinitionOrFallback(hitBrick.partId);
           const hitHeight = hitDef
             ? hitDef.dimensions.heightPlates * PLATE_HEIGHT
             : BRICK_HEIGHT;

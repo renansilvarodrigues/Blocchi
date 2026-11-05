@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Trash2, Copy, RotateCw, Code, Magnet, Layers } from 'lucide-react';
 import type { PlacedBrick, LegoPartDefinition, LDrawColor } from '../../types/lego';
 import { getLDrawColor } from '../../ldraw/colors';
-import { LEGO_PARTS_CATALOG } from '../../ldraw/partsData';
+import { getPartDefinitionOrFallback } from '../../ldraw/partsCatalogService';
 import { PLATE_HEIGHT, HALF_STUD } from '../../ldraw/proceduralBricks';
 
 interface SceneInspectorProps {
@@ -394,7 +394,7 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
 }) => {
   const selectedBrick = bricks.find((b) => b.instanceId === selectedBrickId);
   const partDef = selectedBrick
-    ? LEGO_PARTS_CATALOG.find((p) => p.id === selectedBrick.partId)
+    ? getPartDefinitionOrFallback(selectedBrick.partId)
     : null;
   const color = selectedBrick ? getLDrawColor(selectedBrick.colorCode) : null;
 
@@ -483,7 +483,7 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
             const isSelected = selectedBrickIds.includes(brick.instanceId) || brick.instanceId === selectedBrickId;
             const isPrimary = brick.instanceId === selectedBrickId;
             const bColor = getLDrawColor(brick.colorCode);
-            const bDef = LEGO_PARTS_CATALOG.find((p) => p.id === brick.partId);
+            const bDef = getPartDefinitionOrFallback(brick.partId);
 
             return (
               <div

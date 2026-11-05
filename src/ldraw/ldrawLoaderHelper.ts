@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import { LDrawLoader } from 'three/addons/loaders/LDrawLoader.js';
 import { LDrawConditionalLineMaterial } from 'three/addons/materials/LDrawConditionalLineMaterial.js';
-import { LEGO_PARTS_CATALOG, generateLDrawSource } from './partsData';
-import { generateLDConfigDirectives } from './colors';
-import { LDU_SCALE } from './proceduralBricks';
+import { generateLDConfigDirectives, getLDrawColor } from './colors';
+import { LDU_SCALE, createBrickMesh } from './proceduralBricks';
+import { getPartDefinitionOrFallback } from './partsCatalogService';
+import type { LegoPartDefinition } from '../types/lego';
 
 let cachedLoader: LDrawLoader | null = null;
+const partGroupCache = new Map<string, THREE.Group>();
 
 /**
  * Obtém ou inicializa o LDrawLoader configurado com materiais condicionais,
@@ -18,7 +20,7 @@ export function getInitializedLDrawLoader(): LDrawLoader {
   loader.setConditionalLineMaterial(LDrawConditionalLineMaterial);
   loader.addDefaultMaterials();
 
-  // Configurar caminho base da biblioteca LDraw (/p/ e /parts/)
+  // Configurar caminhos de busca oficiais da biblioteca LDraw (/parts/ e /p/)
   const baseUrl = import.meta.env.BASE_URL || '/';
   const ldrawPath = baseUrl.endsWith('/') ? `${baseUrl}ldraw/` : `${baseUrl}/ldraw/`;
   loader.setPartsLibraryPath(ldrawPath);
@@ -43,48 +45,121 @@ export function getInitializedLDrawLoader(): LDrawLoader {
 }
 
 /**
+ * Cria um bloco padrão de fallback resiliente e visualmente consistente
+ * caso um arquivo LDraw específico falhe ao carregar ou contenha erros de sintaxe.
+ */
+export function createDefaultFallbackBrick(
+  partId: string,
+  colorCode: number = 4,
+  partDef?: LegoPartDefinition
+): THREE.Group {
+  const def = partDef || getPartDefinitionOrFallback(partId);
+
+  try {
+    const mesh = createBrickMesh(def, colorCode);
+    mesh.name = `fallback_${partId}_${colorCode}`;
+    mesh.userData = {
+      partId,
+      colorCode,
+      isFallback: true,
+    };
+    return mesh;
+  } catch (err) {
+    console.warn(`[Blocchi 3D] Falha no gerador procedural para fallback de "${partId}", usando bloco cúbico:`, err);
+
+    // Bloco cúbico mínimo garantido 100% à prova de falhas
+    const group = new THREE.Group();
+    group.name = `fallback_box_${partId}_${colorCode}`;
+
+    const color = getLDrawColor(colorCode);
+    const material = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(color.hex),
+      roughness: 0.25,
+      metalness: 0.05,
+    });
+
+    const sx = Math.max(1, def.dimensions?.studsX || 1) * 0.8;
+    const sz = Math.max(1, def.dimensions?.studsZ || 1) * 0.8;
+    const sy = Math.max(1, def.dimensions?.heightPlates || 3) * 0.32;
+
+    const boxGeo = new THREE.BoxGeometry(sx, sy, sz);
+    const boxMesh = new THREE.Mesh(boxGeo, material);
+    boxMesh.castShadow = true;
+    boxMesh.receiveShadow = true;
+    boxMesh.position.y = sy / 2;
+    group.add(boxMesh);
+
+    // Adicionar contorno de aviso
+    const edges = new THREE.EdgesGeometry(boxGeo);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x333333 });
+    const wireframe = new THREE.LineSegments(edges, lineMat);
+    wireframe.position.y = sy / 2;
+    group.add(wireframe);
+
+    group.userData = {
+      partId,
+      colorCode,
+      isFallback: true,
+    };
+
+    return group;
+  }
+}
+
+/**
  * Carrega e converte uma peça LDraw para um THREE.Group pronto para a cena
- * com fallback inteligente para gerador procedural
+ * Implementa carregamento sob demanda real (Lazy Loading) e cache em memória.
  */
 export async function loadLDrawPart(
   partId: string,
   colorCode: number = 4
 ): Promise<THREE.Group> {
-  const part = LEGO_PARTS_CATALOG.find((p) => p.id === partId);
-  if (!part) {
-    throw new Error(`Peça LDraw ${partId} não encontrada no catálogo.`);
+  const cleanId = partId.replace(/\.dat$/i, '').trim();
+  const cacheKey = `${cleanId}_${colorCode}`.toLowerCase();
+
+  // 1. Verificar cache em memória para reaproveitamento instantâneo
+  if (partGroupCache.has(cacheKey)) {
+    return partGroupCache.get(cacheKey)!.clone(true);
   }
 
   const loader = getInitializedLDrawLoader();
   const baseUrl = import.meta.env.BASE_URL || '/';
   const ldrawPath = baseUrl.endsWith('/') ? `${baseUrl}ldraw/` : `${baseUrl}/ldraw/`;
+  const fileUrl = `${ldrawPath}parts/${cleanId}.dat`;
 
-  // Tentar carregar diretamente o arquivo oficial .dat da biblioteca
   return new Promise((resolve) => {
-    const fileUrl = `${ldrawPath}parts/${part.id}.dat`;
-
     loader.load(
       fileUrl,
       (group: THREE.Group) => {
-        const wrapper = finalizeLoadedGroup(group, part.id, colorCode);
-        resolve(wrapper);
+        try {
+          // Aplicar cor oficial nas geometrias que utilizam a cor padrão 16
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (loader as any).applyMaterialsToMesh?.(
+            group,
+            String(colorCode),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (loader as any).materialLibrary,
+            true
+          );
+
+          const wrapper = finalizeLoadedGroup(group, cleanId, colorCode);
+          partGroupCache.set(cacheKey, wrapper);
+          resolve(wrapper.clone(true));
+        } catch (err) {
+          console.warn(`[Blocchi 3D] Erro ao finalizar peça LDraw "${cleanId}":`, err);
+          const fallback = createDefaultFallbackBrick(cleanId, colorCode);
+          resolve(fallback);
+        }
       },
       undefined,
       (err) => {
-        console.warn(`[LDrawLoader] Não foi possível carregar ${fileUrl}, usando gerador embutido:`, err);
-        // Fallback: parsear código LDraw gerado proceduralmente
-        const ldrawSource = generateLDrawSource(part, colorCode);
-        loader.parse(
-          ldrawSource,
-          (group: THREE.Group) => {
-            const wrapper = finalizeLoadedGroup(group, part.id, colorCode);
-            resolve(wrapper);
-          },
-          (parseErr) => {
-            console.error('Falha no fallback LDraw:', parseErr);
-            throw parseErr;
-          }
+        // Tratamento elegante de erro: log de aviso sem quebrar a aplicação
+        console.warn(
+          `[Blocchi 3D] Peça LDraw "${cleanId}" não pôde ser carregada de "${fileUrl}". Usando bloco padrão (fallback):`,
+          err
         );
+        const fallback = createDefaultFallbackBrick(cleanId, colorCode);
+        resolve(fallback);
       }
     );
   });
@@ -94,11 +169,11 @@ function finalizeLoadedGroup(group: THREE.Group, partId: string, colorCode: numb
   const wrapper = new THREE.Group();
   wrapper.name = `ldraw_${partId}_${colorCode}`;
 
-  // No LDraw, -Y é para cima. Invertemos Y e aplicamos a escala LDU_SCALE
+  // No padrão LDraw, -Y é para cima. Invertemos Y e aplicamos a escala oficial LDU_SCALE
   group.rotation.x = Math.PI;
   group.scale.set(LDU_SCALE, LDU_SCALE, LDU_SCALE);
 
-  // Habilitar projeção e recepção de sombras
+  // Habilitar sombras e metadados
   group.traverse((child) => {
     if ((child as THREE.Mesh).isMesh) {
       const mesh = child as THREE.Mesh;
