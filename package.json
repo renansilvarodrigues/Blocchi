@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "sync-ldraw": "node scripts/sync-ldraw.mjs",
-    "build": "node scripts/sync-ldraw.mjs && tsc -b && vite build",
+    "build": "node scripts/download-ldraw.mjs && node scripts/sync-ldraw.mjs && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },
