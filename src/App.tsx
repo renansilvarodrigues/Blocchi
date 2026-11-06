@@ -26,24 +26,16 @@ import {
 import { X, Copy, Download, Code } from 'lucide-react';
 
 export function App() {
-  // Peça inicial de teste: Bloco 2x4 LDraw (#3001) Vermelho no centro da mesa com snap oficial
-  const [bricks, setBricks] = useState<PlacedBrick[]>([
-    {
-      instanceId: 'brick_init_3001',
-      partId: '3001', // Brick 2 x 4
-      name: 'Brick 2 x 4',
-      colorCode: 4, // Vermelho oficial LDraw
-      position: [0, 0, 0], // Exatamente no centro da mesa (0, 0, 0)
-      rotation: [0, 0, 0],
-    },
-  ]);
+  // A viewport inicia completamente vazia. Nenhuma peça é instanciada automaticamente
+  // ao abrir o Blocchi ou iniciar um novo projeto.
+  const [bricks, setBricks] = useState<PlacedBrick[]>([]);
 
   // Histórico de Ações (Undo / Redo)
   const [past, setPast] = useState<PlacedBrick[][]>([]);
   const [future, setFuture] = useState<PlacedBrick[][]>([]);
 
   // Estado de Seleção Múltipla
-  const [selectedBrickIds, setSelectedBrickIds] = useState<string[]>(['brick_init_3001']);
+  const [selectedBrickIds, setSelectedBrickIds] = useState<string[]>([]);
   const selectedBrickId = selectedBrickIds[selectedBrickIds.length - 1] || null;
 
   const [activeColorCode, setActiveColorCode] = useState<number>(4);
@@ -61,7 +53,7 @@ export function App() {
   const [exportedLDrawCode, setExportedLDrawCode] = useState<string>('');
 
   const [stats, setStats] = useState({
-    count: 1,
+    count: 0,
     vertices: 0,
     triangles: 0,
   });

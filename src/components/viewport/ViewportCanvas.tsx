@@ -18,7 +18,7 @@ import {
   STUD_SPACING,
   BRICK_HEIGHT,
 } from '../../ldraw/proceduralBricks';
-import { loadUnifiedBrick, createDefaultFallbackBrick } from '../../ldraw/ldrawLoaderHelper';
+import { loadUnifiedBrick } from '../../ldraw/ldrawLoaderHelper';
 import { getPartDefinitionOrFallback } from '../../ldraw/partsCatalogService';
 
 interface ViewportCanvasProps {
@@ -105,6 +105,7 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
 
   const ghostRotYRef = useRef<number>(0);
   const ghostPositionRef = useRef<[number, number, number]>([0, 0, 0]);
+  const ghostVisibleRef = useRef<boolean>(false);
 
   const selectedBrickIdRef = useRef<string | null>(selectedBrickId);
   const selectedBrickIdsRef = useRef<string[]>(selectedBrickIds);
@@ -467,6 +468,18 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
     scene.add(selectionBoxesGroup);
     selectionBoxesGroupRef.current = selectionBoxesGroup;
 
+    // Hook de depuração restrito ao ambiente de desenvolvimento.
+    if (import.meta.env.DEV) {
+      (window as unknown as Record<string, unknown>).__blocchiDebug = {
+        THREE,
+        scene,
+        camera,
+        renderer,
+        controls,
+        bricksGroup,
+      };
+    }
+
     // Loop de Animação
     let animationFrameId: number;
     const animate = () => {
@@ -580,10 +593,9 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
     const loadBricks = async () => {
       let totalVertices = 0;
       let totalTriangles = 0;
+      let loadedCount = 0;
 
       for (const brick of bricks) {
-        const partDef = getPartDefinitionOrFallback(brick.partId);
-
         let brickMesh: THREE.Group;
         try {
           brickMesh = await loadUnifiedBrick(
@@ -593,8 +605,13 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
             settings.shadingMode === 'wireframe'
           );
         } catch (e) {
-          console.warn('Falha no carregamento unificado da peça, usando fallback:', e);
-          brickMesh = createDefaultFallbackBrick(brick.partId, brick.colorCode, partDef, engineMode);
+          // Sem fallback silencioso: a peça é omitida e o erro completo fica no console.
+          console.error(
+            `[Blocchi 3D] Peça "${brick.partId}" (instância ${brick.instanceId}) não pôde ser ` +
+              'carregada e foi omitida da cena. Verifique o log detalhado do loader LDraw acima.',
+            e
+          );
+          continue;
         }
 
         if (isCancelled) return;
@@ -603,16 +620,22 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
         brickMesh.position.set(...brick.position);
         brickMesh.rotation.set(...brick.rotation);
 
+        const showLines = settings.showOutlines || settings.shadingMode === 'wireframe';
+
         brickMesh.traverse((child) => {
           if ((child as THREE.LineSegments).isLineSegments || (child as THREE.Line).isLine) {
-            child.visible =
-              engineMode === 'ldraw'
-                ? settings.showOutlines
-                : settings.shadingMode === 'wireframe';
+            if (engineMode === 'ldraw') {
+              // Arestas nativas do LDraw Loader.
+              child.visible = settings.showOutlines;
+            } else {
+              // ABS Studio: linhas nativas ficam ocultas; contornos próprios seguem o toggle.
+              child.visible = child.userData.studioOutline ? showLines : false;
+            }
           }
         });
 
         group.add(brickMesh);
+        loadedCount++;
 
         brickMesh.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
@@ -633,7 +656,7 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
       }
 
       onStatsUpdate({
-        count: bricks.length,
+        count: loadedCount,
         vertices: totalVertices,
         triangles: Math.round(totalTriangles),
       });
@@ -725,45 +748,59 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
       ghost.traverse((child) => {
         if ((child as THREE.Mesh).isMesh) {
           const mesh = child as THREE.Mesh;
-          const curMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-          const mat = curMat ? (curMat.clone() as THREE.MeshPhysicalMaterial) : new THREE.MeshPhysicalMaterial();
-          mat.transparent = true;
-          mat.opacity = 0.75;
-          mat.roughness = 0.35;
-          mat.metalness = 0.05;
-          mat.emissive = new THREE.Color(0xf59e0b);
-          mat.emissiveIntensity = 0.25;
-          mesh.material = mat;
+          const original = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          const styled = original.map((material) => {
+            const mat = material
+              ? (material.clone() as THREE.MeshPhysicalMaterial)
+              : new THREE.MeshPhysicalMaterial();
+            mat.transparent = true;
+            mat.opacity = 0.75;
+            mat.depthWrite = false;
+            mat.roughness = 0.35;
+            mat.metalness = 0.05;
+            mat.emissive = new THREE.Color(0xf59e0b);
+            mat.emissiveIntensity = 0.25;
+            return mat;
+          });
+          mesh.material = Array.isArray(mesh.material) ? styled : styled[0];
+        } else if ((child as THREE.LineSegments).isLineSegments) {
+          const line = child as THREE.LineSegments;
+          const mat = new THREE.LineBasicMaterial({
+            color: 0xf59e0b,
+            transparent: true,
+            opacity: 0.35,
+            depthWrite: false,
+          });
+          line.material = mat;
+          line.visible = true;
         }
       });
     };
 
-    // Criar ghost preliminar instantâneo com dimensões compatíveis
-    const initialGhost = createDefaultFallbackBrick(
-      activePlacement.partDef.id,
-      activePlacement.colorCode,
-      activePlacement.partDef,
-      engineMode
-    );
-    applyGhostStyle(initialGhost);
+    // Placeholder invisível: garante que o posicionamento por raycast já
+    // funcione enquanto a geometria real é carregada. Nenhum cubo é exibido.
+    const placeholder = new THREE.Group();
+    placeholder.name = 'placement_ghost_brick';
 
     // Iniciar rotação igual à original (se houver)
     const initRotY = activePlacement.initialRotation ? activePlacement.initialRotation[1] : 0;
     ghostRotYRef.current = initRotY;
-    initialGhost.rotation.set(0, initRotY, 0);
+    placeholder.rotation.set(0, initRotY, 0);
 
     // Posição inicial: se reposicionando, inicia na posição original da peça
     if (activePlacement.mode === 'reposition' && activePlacement.originalPosition) {
-      initialGhost.position.set(...activePlacement.originalPosition);
+      placeholder.position.set(...activePlacement.originalPosition);
       ghostPositionRef.current = [...activePlacement.originalPosition];
-      initialGhost.visible = true;
+      placeholder.visible = true;
+      ghostVisibleRef.current = true;
     } else {
-      initialGhost.position.set(...ghostPositionRef.current);
-      initialGhost.visible = false;
+      placeholder.position.set(...ghostPositionRef.current);
+      placeholder.visible = false;
+      ghostVisibleRef.current = false;
     }
 
-    scene.add(initialGhost);
-    ghostMeshRef.current = initialGhost;
+    scene.add(placeholder);
+    ghostMeshRef.current = placeholder;
 
     // Carregar geometria real unificada (mesma BufferGeometry LDraw para ambos os motores)
     loadUnifiedBrick(activePlacement.partDef.id, activePlacement.colorCode, engineMode)
@@ -772,7 +809,7 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
         applyGhostStyle(realGhost);
         realGhost.rotation.set(0, ghostRotYRef.current, 0);
         realGhost.position.set(...ghostPositionRef.current);
-        realGhost.visible = ghostMeshRef.current ? ghostMeshRef.current.visible : false;
+        realGhost.visible = ghostVisibleRef.current;
 
         if (ghostMeshRef.current) {
           sceneRef.current.remove(ghostMeshRef.current);
@@ -781,7 +818,11 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
         ghostMeshRef.current = realGhost;
       })
       .catch((err) => {
-        console.warn('Aviso no ghost unificado:', err);
+        console.error(
+          `[Blocchi 3D] Ghost da peça "${activePlacement.partDef.id}" não pôde ser carregado. ` +
+            'O preview ficará vazio — nenhuma geometria substituta será exibida.',
+          err
+        );
       });
 
     // Atalhos durante o modo fantasma: R (girar 90°) e Esc (cancelar)
@@ -799,6 +840,7 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       isCancelled = true;
+      ghostVisibleRef.current = false;
       window.removeEventListener('keydown', handleKeyDown);
       if (ghostMeshRef.current) {
         scene.remove(ghostMeshRef.current);
@@ -941,6 +983,7 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
       ghostMeshRef.current.position.set(...targetPos);
       ghostMeshRef.current.rotation.set(0, ghostRotYRef.current, 0);
       ghostMeshRef.current.visible = true;
+      ghostVisibleRef.current = true;
       ghostPositionRef.current = targetPos;
       container.style.cursor = 'crosshair';
       return;

@@ -491,7 +491,8 @@ export const LEGO_PARTS_CATALOG: LegoPartDefinition[] = [
     description: 'Ladrilho circular 2x2 liso.',
   },
   {
-    id: '4589b',
+    // O arquivo oficial atual é 4589.dat; 4589b não existe mais na biblioteca.
+    id: '4589',
     name: 'Cone 1 x 1 with Top Groove',
     category: 'Bricks - Special - Circles',
     dimensions: { studsX: 1, studsZ: 1, heightPlates: 3 },

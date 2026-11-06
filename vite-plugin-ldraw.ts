@@ -26,6 +26,20 @@ export function ldrawVitePlugin(): Plugin {
     }
   }
 
+  function basePriority(lowerRel: string): number {
+    // Prioridade oficial: parts/ > p/48 > p > p/8.
+    if (/^parts\/[^/]+\.dat$/.test(lowerRel)) return 100;
+    if (lowerRel.startsWith('parts/textures/')) return 95;
+    if (lowerRel.startsWith('parts/') && !lowerRel.startsWith('parts/s/')) return 85;
+    if (lowerRel.startsWith('p/48/')) return 80;
+    if (lowerRel.startsWith('parts/48/')) return 70;
+    if (/^p\/[^/]+\.dat$/.test(lowerRel)) return 60;
+    if (lowerRel.startsWith('p/') && !lowerRel.startsWith('p/8/')) return 55;
+    if (lowerRel.startsWith('parts/s/')) return 30;
+    if (lowerRel.startsWith('p/8/')) return 20;
+    return 10;
+  }
+
   function ensureFileMap(): Record<string, string> | null {
     if (fileMapCache) return fileMapCache;
 
@@ -42,6 +56,7 @@ export function ldrawVitePlugin(): Plugin {
 
     console.log('[Vite LDraw Plugin] Indexando mapa completo de arquivos LDraw sob demanda...');
     const map: Record<string, string> = {};
+    const priorities = new Map<string, number>();
 
     for (const [entryKey, entry] of zipData.entryMap.entries()) {
       if (entry.isDirectory) continue;
@@ -54,17 +69,21 @@ export function ldrawVitePlugin(): Plugin {
       // Mapeamento direto do caminho relativo oficial (ex: parts/3001.dat, p/48/1-4cyli.dat)
       map[lowerRel] = relPath;
 
-      // Mapeamento por nome base (ex: "1-4cyli.dat" -> "p/48/1-4cyli.dat")
-      if (!map[base] || lowerRel.includes('/48/') || lowerRel.startsWith('parts/')) {
+      // Mapeamento por nome base, respeitando a prioridade de qualidade.
+      const priority = basePriority(lowerRel);
+      if (!(base in map) || priority > (priorities.get(base) ?? -1)) {
         map[base] = relPath;
+        priorities.set(base, priority);
       }
 
-      // Mapeamento de subdiretórios típicos do LDraw (ex: "48/1-4cyli.dat", "s/3626ap01s01.dat")
-      if (lowerRel.startsWith('ldraw/p/48/') || lowerRel.startsWith('p/48/')) {
+      // Aliases de subdiretórios usados nas referências LDraw.
+      if (lowerRel.startsWith('p/48/')) {
         map[`48/${base}`] = relPath;
-      } else if (lowerRel.startsWith('ldraw/parts/s/') || lowerRel.startsWith('parts/s/')) {
+      } else if (lowerRel.startsWith('p/8/')) {
+        map[`8/${base}`] = relPath;
+      } else if (lowerRel.startsWith('parts/s/')) {
         map[`s/${base}`] = relPath;
-      } else if (lowerRel.startsWith('ldraw/parts/textures/') || lowerRel.startsWith('parts/textures/')) {
+      } else if (lowerRel.startsWith('parts/textures/')) {
         map[`textures/${base}`] = relPath;
       }
     }
@@ -129,55 +148,18 @@ export function ldrawVitePlugin(): Plugin {
     return content;
   }
 
-  /**
-   * Ativa decalques/estampas em arquivos LDraw pré-processando comandos !TEXMAP:
-   * remove o prefixo '0 !: ' das linhas de geometria texturizada e desativa os fallbacks lisos.
-   */
-  function processTexmapDirectives(content: string): string {
-    if (!content.includes('!TEXMAP')) return content;
-
-    const lines = content.split(/\r?\n/);
-    const result: string[] = [];
-    let insideTexmapActive = false;
-    let insideFallback = false;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trim();
-
-      if (trimmed.startsWith('0 !TEXMAP START')) {
-        insideTexmapActive = true;
-        insideFallback = false;
-        result.push(line);
-      } else if (trimmed.startsWith('0 !TEXMAP FALLBACK')) {
-        insideTexmapActive = false;
-        insideFallback = true;
-        result.push(line);
-      } else if (trimmed.startsWith('0 !TEXMAP END')) {
-        insideTexmapActive = false;
-        insideFallback = false;
-        result.push(line);
-      } else if (insideTexmapActive && trimmed.startsWith('0 !:')) {
-        // Ativar a linha de geometria com textura real (subpartes, quads ou triângulos)
-        result.push(line.replace(/0\s+!:\s*/, ''));
-      } else if (insideFallback) {
-        // Desativar fallbacks lisos sem estampa para não duplicar geometria
-        if (/^[12345]\s/.test(trimmed)) {
-          result.push(`0 // ${line}`);
-        } else {
-          result.push(line);
-        }
-      } else {
-        result.push(line);
-      }
-    }
-
-    return result.join('\n');
-  }
-
   return {
     name: 'vite-plugin-ldraw',
     configureServer(server) {
+      const configuredBase = server.config.base || '/';
+      const normalizedBase =
+        configuredBase === './' || configuredBase === '.'
+          ? '/'
+          : configuredBase.endsWith('/')
+          ? configuredBase
+          : `${configuredBase}/`;
+      const ldrawBase = `${normalizedBase}ldraw/`;
+
       server.middlewares.use((req, res, next) => {
         const rawUrl = req.url ? req.url.split('?')[0] : '';
         const url = decodeURIComponent(rawUrl).replace(/\\/g, '/');
@@ -254,10 +236,16 @@ export function ldrawVitePlugin(): Plugin {
           }
         }
 
-        // 5. Interceptar qualquer recurso LDraw sob demanda (/ldraw/...)
-        const ldrawPrefixMatch = url.match(/\/ldraw\/(.+)$/i);
-        if (ldrawPrefixMatch) {
-          let reqPath = ldrawPrefixMatch[1].trim();
+        // 5. Interceptar qualquer recurso LDraw sob demanda (/ldraw/...).
+        // Importante: apenas a raiz da biblioteca — nunca módulos do app como
+        // /src/ldraw/*.ts, que devem ser transformados pelo próprio Vite.
+        const isLibraryAsset = url.startsWith(ldrawBase) || url.startsWith('/ldraw/');
+        if (isLibraryAsset) {
+          let reqPath = (
+            url.startsWith(ldrawBase)
+              ? url.slice(ldrawBase.length)
+              : url.slice('/ldraw/'.length)
+          ).trim();
 
           // Limpar prefixos duplicados acidentais
           reqPath = reqPath.replace(/^parts\/parts\//i, 'parts/');
@@ -293,8 +281,7 @@ export function ldrawVitePlugin(): Plugin {
                 res.setHeader('Cache-Control', 'public, max-age=31536000');
                 res.end(fs.readFileSync(cand));
               } else {
-                let content = fs.readFileSync(cand, 'utf8');
-                content = processTexmapDirectives(content);
+                const content = fs.readFileSync(cand, 'utf8');
                 res.setHeader('Content-Type', 'text/plain; charset=utf-8');
                 res.setHeader('Cache-Control', 'public, max-age=31536000');
                 res.end(content);
@@ -362,8 +349,7 @@ export function ldrawVitePlugin(): Plugin {
                 res.setHeader('Cache-Control', 'public, max-age=31536000');
                 res.end(data);
               } else {
-                let text = data.toString('utf8');
-                text = processTexmapDirectives(text);
+                const text = data.toString('utf8');
                 res.setHeader('Content-Type', 'text/plain; charset=utf-8');
                 res.setHeader('Cache-Control', 'public, max-age=31536000');
                 res.end(text);
@@ -371,10 +357,17 @@ export function ldrawVitePlugin(): Plugin {
               return;
             }
           }
+
+          // Recurso LDraw explicitamente ausente: nunca cair no fallback HTML do SPA,
+          // que faria o parser interpretar uma página inteira como geometria.
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+          res.end(`LDraw asset not found: ${reqPath}`);
+          return;
         }
 
         next();
-      });
+    });
     },
   };
 }

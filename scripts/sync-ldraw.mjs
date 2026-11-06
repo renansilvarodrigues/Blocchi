@@ -77,7 +77,7 @@ export const CURATED_PARTS_LIST = [
   { id: '3941', name: 'Brick 2 x 2 Round', category: 'Bricks - Special - Circles', studsX: 2, studsZ: 2, heightPlates: 3, hasStuds: true },
   { id: '98138', name: 'Tile 1 x 1 Round', category: 'Plates - Specials - Flat', studsX: 1, studsZ: 1, heightPlates: 1, hasStuds: false },
   { id: '14769', name: 'Tile 2 x 2 Round', category: 'Plates - Specials - Flat', studsX: 2, studsZ: 2, heightPlates: 1, hasStuds: false },
-  { id: '4589b', name: 'Cone 1 x 1 with Top Groove', category: 'Bricks - Special - Circles', studsX: 1, studsZ: 1, heightPlates: 3, hasStuds: true },
+  { id: '4589', name: 'Cone 1 x 1 with Top Groove', category: 'Bricks - Special - Circles', studsX: 1, studsZ: 1, heightPlates: 3, hasStuds: true },
   { id: '3942c', name: 'Cone 2 x 2 x 2 with Open Stud', category: 'Bricks - Special - Circles', studsX: 2, studsZ: 2, heightPlates: 6, hasStuds: true },
   { id: '3960', name: 'Dish 4 x 4 Inverted (Radar)', category: 'Various Parts', studsX: 4, studsZ: 4, heightPlates: 3, hasStuds: true },
 
@@ -335,7 +335,59 @@ export async function downloadCompleteZip() {
 }
 
 /**
- * Extrai primitivas, cores e peças do catálogo com resolução recursiva de dependências
+ * Prioridade canônica das primitivas LDraw:
+ * parts/ > p/48 > p > p/8. Isso impede que `stud.dat` resolva para
+ * p/8/stud.dat (octogonal) quando existe p/stud.dat (16 lados + p/48).
+ */
+function basePriority(lowerRel) {
+  if (/^parts\/[^/]+\.dat$/.test(lowerRel)) return 100;
+  if (lowerRel.startsWith('parts/textures/')) return 95;
+  if (lowerRel.startsWith('parts/') && !lowerRel.startsWith('parts/s/')) return 85;
+  if (lowerRel.startsWith('p/48/')) return 80;
+  if (lowerRel.startsWith('parts/48/')) return 70;
+  if (/^p\/[^/]+\.dat$/.test(lowerRel)) return 60;
+  if (lowerRel.startsWith('p/') && !lowerRel.startsWith('p/8/')) return 55;
+  if (lowerRel.startsWith('parts/s/')) return 30;
+  if (lowerRel.startsWith('p/8/')) return 20;
+  return 10;
+}
+
+function buildFileMap(entries) {
+  const map = Object.create(null);
+  const priorities = new Map();
+
+  for (const entry of entries) {
+    if (entry.isDirectory) continue;
+    if (!entry.entryName.toLowerCase().startsWith('ldraw/')) continue;
+
+    const relPath = entry.entryName.replace(/\\/g, '/').substring('ldraw/'.length);
+    const lowerRel = relPath.toLowerCase();
+    const base = path.basename(lowerRel);
+
+    map[lowerRel] = relPath;
+
+    const priority = basePriority(lowerRel);
+    if (!(base in map) || priority > (priorities.get(base) ?? -1)) {
+      map[base] = relPath;
+      priorities.set(base, priority);
+    }
+
+    if (lowerRel.startsWith('p/48/')) {
+      map[`48/${base}`] = relPath;
+    } else if (lowerRel.startsWith('p/8/')) {
+      map[`8/${base}`] = relPath;
+    } else if (lowerRel.startsWith('parts/s/')) {
+      map[`s/${base}`] = relPath;
+    } else if (lowerRel.startsWith('parts/textures/')) {
+      map[`textures/${base}`] = relPath;
+    }
+  }
+
+  return map;
+}
+
+/**
+ * Extrai primitivas, cores, texturas e peças do catálogo com resolução recursiva de dependências
  */
 export async function extractAndIndexLibrary() {
   console.log('[LDraw Sync] Processando arquivo ZIP e extraindo dependências...');
@@ -345,6 +397,7 @@ export async function extractAndIndexLibrary() {
   fs.mkdirSync(path.join(publicLDrawDir, 'p'), { recursive: true });
   fs.mkdirSync(path.join(publicLDrawDir, 'parts'), { recursive: true });
   fs.mkdirSync(path.join(publicLDrawDir, 'parts', 's'), { recursive: true });
+  fs.mkdirSync(path.join(publicLDrawDir, 'parts', 'textures'), { recursive: true });
 
   const entries = zip.getEntries();
   const entryMap = new Map();
@@ -378,6 +431,37 @@ export async function extractAndIndexLibrary() {
     }
   }
   console.log(`[LDraw Sync] ${primitivesCount} primitivas extraídas em public/ldraw/p/.`);
+
+  // 2b. Gerar filemap canônico (parts/ > p/48 > p > p/8)
+  console.log('[LDraw Sync] Gerando filemap canônico...');
+  const fileMap = buildFileMap(entries);
+  const fileMapPath = path.join(publicLDrawDir, 'filemap.json');
+  fs.writeFileSync(fileMapPath, JSON.stringify(fileMap), 'utf8');
+  console.log(
+    `[LDraw Sync] filemap.json gerado com ${Object.keys(fileMap).length} mapeamentos ` +
+      `(${(fs.statSync(fileMapPath).size / 1024 / 1024).toFixed(2)} MB).`
+  );
+
+  // 2c. Extrair todas as texturas oficiais usadas por !TEXMAP
+  console.log('[LDraw Sync] Extraindo texturas oficiais de peças...');
+  let textureCount = 0;
+  for (const entry of entries) {
+    const lowerName = entry.entryName.toLowerCase();
+    if (
+      entry.isDirectory ||
+      !lowerName.startsWith('ldraw/parts/textures/') ||
+      !/\.(png|jpg|jpeg)$/i.test(lowerName)
+    ) {
+      continue;
+    }
+
+    const relPath = entry.entryName.replace(/\\/g, '/').substring('ldraw/'.length);
+    const dest = path.join(publicLDrawDir, relPath);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, entry.getData());
+    textureCount++;
+  }
+  console.log(`[LDraw Sync] ${textureCount} texturas extraídas em public/ldraw/parts/textures/.`);
 
   // 3. Gerar arquivo de índice oficial parts.lst a partir do complete.zip
   console.log('[LDraw Sync] Gerando arquivo de índice oficial parts.lst...');
@@ -425,52 +509,67 @@ export async function extractAndIndexLibrary() {
   console.log('[LDraw Sync] Extraindo e indexando peças prioritárias...');
   const catalog = [];
   const extractedParts = new Set();
+  const missingDependencies = new Set();
 
-  function extractPartRecursive(filename) {
-    const norm = filename.replace(/\\/g, '/').toLowerCase();
+  function resolveLdrawReference(name, fromCanonical) {
+    const normalized = name.replace(/\\/g, '/').toLowerCase().replace(/^ldraw\//, '');
+    if (!normalized) return null;
+
+    const direct = fileMap[normalized];
+    if (direct) return direct;
+
+    if (fromCanonical) {
+      const slash = fromCanonical.replace(/\\/g, '/').lastIndexOf('/');
+      if (slash > 0) {
+        const relative = `${fromCanonical.slice(0, slash)}/${normalized}`.toLowerCase();
+        if (fileMap[relative]) return fileMap[relative];
+      }
+    }
+
+    const base = path.basename(normalized);
+    return fileMap[base] ?? null;
+  }
+
+  function extractPartRecursive(requestName, fromCanonical = null) {
+    const canonical = resolveLdrawReference(requestName, fromCanonical);
+    if (!canonical) {
+      missingDependencies.add(
+        `"${requestName}"${fromCanonical ? ` (referenciado por "${fromCanonical}")` : ''}`
+      );
+      return;
+    }
+
+    const norm = canonical.replace(/\\/g, '/').toLowerCase();
     if (extractedParts.has(norm)) return;
     extractedParts.add(norm);
 
-    let zipEntry = entryMap.get(`ldraw/parts/${norm}`);
-    if (!zipEntry && !norm.startsWith('s/')) {
-      zipEntry = entryMap.get(`ldraw/parts/s/${norm}`);
-    }
+    const zipEntry = entryMap.get(`ldraw/${norm}`);
     if (!zipEntry) {
-      zipEntry = entryMap.get(`ldraw/p/${norm}`);
+      missingDependencies.add(`"${canonical}" (entrada ausente no complete.zip)`);
+      return;
     }
 
-    if (!zipEntry) return;
-
-    // Salvar no destino correto
-    let dest;
-    if (norm.startsWith('s/')) {
-      dest = path.join(publicLDrawDir, 'parts', norm);
-    } else {
-      dest = path.join(publicLDrawDir, 'parts', norm);
-    }
-
+    const dest = path.join(publicLDrawDir, canonical);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     const data = zipEntry.getData();
     fs.writeFileSync(dest, data);
 
-    // Parsear sub-arquivos referenciados (Linha tipo 1)
+    // Resolver subarquivos (linha tipo 1) preservando o contexto canônico.
     const text = data.toString('utf8');
-    const lines = text.split(/\r?\n/);
-    for (const line of lines) {
+    for (const line of text.split(/\r?\n/)) {
       const trimmed = line.trim();
-      if (trimmed.startsWith('1 ')) {
-        const parts = trimmed.split(/\s+/);
-        const subfile = parts[parts.length - 1];
-        if (subfile && subfile.endsWith('.dat')) {
-          extractPartRecursive(subfile);
-        }
-      }
+      if (!trimmed.startsWith('1 ')) continue;
+      const tokens = trimmed.split(/\s+/);
+      if (tokens.length < 15) continue;
+      const subfile = tokens[tokens.length - 1];
+      if (subfile) extractPartRecursive(subfile, canonical);
     }
   }
 
   for (const item of CURATED_PARTS_LIST) {
-    const filename = `${item.id}.dat`;
-    let zipEntry = entryMap.get(`ldraw/parts/${filename.toLowerCase()}`);
+    const filename = `parts/${item.id}.dat`;
+    const canonicalRoot = resolveLdrawReference(filename);
+    const zipEntry = canonicalRoot ? entryMap.get(`ldraw/${canonicalRoot.toLowerCase()}`) : null;
     let description = item.name;
     let category = item.category;
 
@@ -489,6 +588,8 @@ export async function extractAndIndexLibrary() {
           break;
         }
       }
+    } else {
+      missingDependencies.add(`"${item.id}.dat" (peça curada ausente)`);
     }
 
     catalog.push({
@@ -511,7 +612,34 @@ export async function extractAndIndexLibrary() {
     });
   }
 
-  // 4. Salvar índice do catálogo em JSON para carregamento otimizado (Lazy Loading no Frontend)
+  // 4b. Substituir p/stud.dat por uma versão explícita de alta resolução.
+  // As referências usam 48/... para nunca depender da prioridade do filemap.
+  const highResStud = [
+    '0 Stud',
+    '0 Name: stud.dat',
+    '0 Author: James Jessiman',
+    '0 !LDRAW_ORG Primitive UPDATE 2012-01',
+    '0 !LICENSE Licensed under CC BY 4.0 : see CAreadme.txt',
+    '',
+    '0 BFC CERTIFY CCW',
+    '',
+    '1 16 0 0 0 6 0 0 0 1 0 0 0 6 48/4-4edge.dat',
+    '1 16 0 -4 0 6 0 0 0 1 0 0 0 6 48/4-4edge.dat',
+    '1 16 0 0 0 6 0 0 0 -4 0 0 0 6 48/4-4cyli.dat',
+    '1 16 0 -4 0 6 0 0 0 1 0 0 0 6 48/4-4disc.dat',
+    '',
+  ].join('\n');
+  fs.writeFileSync(path.join(publicLDrawDir, 'p', 'stud.dat'), highResStud, 'utf8');
+  console.log('[LDraw Sync] p/stud.dat substituído pela versão de alta resolução (p/48).');
+
+  if (missingDependencies.size > 0) {
+    console.warn(
+      `[LDraw Sync] ${missingDependencies.size} dependências não encontradas:\n` +
+        [...missingDependencies].slice(0, 50).join('\n')
+    );
+  }
+
+  // 5. Salvar índice do catálogo em JSON para carregamento otimizado (Lazy Loading no Frontend)
   const catalogJsonPath = path.join(publicLDrawDir, 'parts-catalog.json');
   fs.writeFileSync(catalogJsonPath, JSON.stringify(catalog, null, 2), 'utf8');
   console.log(`[LDraw Sync] Catálogo salvo com ${catalog.length} peças em ${catalogJsonPath}.`);
