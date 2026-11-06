@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Trash2, Copy, RotateCw, Code, Magnet, Layers } from 'lucide-react';
 import type { PlacedBrick, LegoPartDefinition, LDrawColor } from '../../types/lego';
-import { getLDrawColor } from '../../ldraw/colors';
+import { getLDrawColor, LDRAW_COLORS } from '../../ldraw/colors';
 import { getPartDefinitionOrFallback } from '../../ldraw/partsCatalogService';
 import { PLATE_HEIGHT, HALF_STUD } from '../../ldraw/proceduralBricks';
 
@@ -16,6 +16,7 @@ interface SceneInspectorProps {
   onDuplicateSelected: () => void;
   onDeleteSelected: () => void;
   onSnapToStuds?: () => void;
+  onSelectColor?: (color: LDrawColor) => void;
 }
 
 interface SelectedBrickEditorProps {
@@ -28,6 +29,7 @@ interface SelectedBrickEditorProps {
   onDuplicateSelected: () => void;
   onDeleteSelected: () => void;
   onSnapToStuds?: () => void;
+  onSelectColor?: (color: LDrawColor) => void;
 }
 
 const SelectedBrickEditor: React.FC<SelectedBrickEditorProps> = ({
@@ -40,6 +42,7 @@ const SelectedBrickEditor: React.FC<SelectedBrickEditorProps> = ({
   onDuplicateSelected,
   onDeleteSelected,
   onSnapToStuds,
+  onSelectColor,
 }) => {
   const [posX, setPosX] = useState(selectedBrick.position[0].toFixed(2));
   const [posY, setPosY] = useState(selectedBrick.position[1].toFixed(2));
@@ -105,6 +108,43 @@ const SelectedBrickEditor: React.FC<SelectedBrickEditorProps> = ({
         <span className="font-mono text-[10px] text-zinc-400 bg-[#16161b] px-1.5 py-0.5 rounded border border-[#30303a]">
           #{partDef.id}
         </span>
+      </div>
+
+      {/* Seletor Dinâmico de Cor LDraw */}
+      <div className="bg-[#17171d] p-2.5 rounded-md border border-[#2d2d38] space-y-1.5">
+        <div className="flex items-center justify-between text-[10px] text-zinc-400">
+          <span className="font-bold uppercase tracking-wider">Cor LDraw Oficial</span>
+          <span className="font-mono text-amber-400 font-medium">#{color.code}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div
+            className="w-7 h-7 rounded border border-white/20 shadow-sm shrink-0 flex items-center justify-center relative overflow-hidden"
+            style={{ backgroundColor: color.hex }}
+          >
+            {color.isTrans && (
+              <span className="text-[7px] text-zinc-900 font-bold bg-white/80 px-0.5 rounded">
+                TR
+              </span>
+            )}
+          </div>
+          <select
+            value={color.code}
+            onChange={(e) => {
+              const targetCode = parseInt(e.target.value, 10);
+              const targetColor = LDRAW_COLORS.find((c) => c.code === targetCode);
+              if (targetColor && onSelectColor) {
+                onSelectColor(targetColor);
+              }
+            }}
+            className="flex-1 bg-[#202028] hover:bg-[#282832] border border-[#30303a] rounded px-2 py-1 text-xs text-zinc-200 focus:outline-none focus:border-amber-500 font-medium cursor-pointer"
+          >
+            {LDRAW_COLORS.map((c) => (
+              <option key={c.code} value={c.code} className="bg-[#1e1e24] text-zinc-200">
+                {c.name} (#{c.code}) - {c.hex}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* 1. Coordenadas de Posição Interativas (X, Y, Z) */}
@@ -391,6 +431,7 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
   onDuplicateSelected,
   onDeleteSelected,
   onSnapToStuds,
+  onSelectColor,
 }) => {
   const selectedBrick = bricks.find((b) => b.instanceId === selectedBrickId);
   const partDef = selectedBrick
@@ -456,6 +497,7 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
           onDuplicateSelected={onDuplicateSelected}
           onDeleteSelected={onDeleteSelected}
           onSnapToStuds={onSnapToStuds}
+          onSelectColor={onSelectColor}
         />
       ) : (
         <div className="p-4 border-b border-[#303038] text-center text-zinc-500">

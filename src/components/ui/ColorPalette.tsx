@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Search, Check } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Search, Check, ChevronDown } from 'lucide-react';
 import { LDRAW_COLORS } from '../../ldraw/colors';
 import type { LDrawColor } from '../../types/lego';
 
@@ -17,18 +17,43 @@ export const ColorPalette: React.FC<ColorPaletteProps> = ({
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('todos');
 
-  const filteredColors = LDRAW_COLORS.filter((color) => {
-    const matchesCategory =
-      categoryFilter === 'todos' || color.category === categoryFilter;
-    const matchesSearch =
-      color.name.toLowerCase().includes(search.toLowerCase()) ||
-      color.code.toString().includes(search) ||
-      color.hex.toLowerCase().includes(search.toLowerCase()) ||
-      (color.finish && color.finish.toLowerCase().includes(search.toLowerCase()));
-    return matchesCategory && matchesSearch;
-  });
+  const filteredColors = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return LDRAW_COLORS.filter((color) => {
+      // 1. Filtro por categoria / acabamento via <select>
+      let matchesCategory = true;
+      if (categoryFilter === 'solid') {
+        matchesCategory = color.category === 'solid' || color.finish === 'solid';
+      } else if (categoryFilter === 'transparent') {
+        matchesCategory =
+          color.isTrans ||
+          color.category === 'transparent' ||
+          color.finish === 'transparent';
+      } else if (categoryFilter === 'chrome') {
+        matchesCategory =
+          color.finish === 'chrome' || color.name.toLowerCase().includes('chrome');
+      } else if (categoryFilter === 'pearl') {
+        matchesCategory =
+          color.finish === 'pearl' || color.name.toLowerCase().includes('pearl');
+      } else if (categoryFilter === 'rubber') {
+        matchesCategory =
+          color.finish === 'rubber' || color.name.toLowerCase().includes('rubber');
+      }
 
-  const activeColor = LDRAW_COLORS.find(c => c.code === selectedColorCode) || LDRAW_COLORS[0];
+      if (!matchesCategory) return false;
+
+      // 2. Busca combinada por texto (nome, código LDraw ou hexadecimal)
+      if (!q) return true;
+      return (
+        color.name.toLowerCase().includes(q) ||
+        color.code.toString().includes(q) ||
+        color.hex.toLowerCase().includes(q)
+      );
+    });
+  }, [categoryFilter, search]);
+
+  const activeColor =
+    LDRAW_COLORS.find((c) => c.code === selectedColorCode) || LDRAW_COLORS[0];
 
   return (
     <div className="flex flex-col h-full text-xs">
@@ -47,7 +72,9 @@ export const ColorPalette: React.FC<ColorPaletteProps> = ({
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-zinc-100 text-sm truncate">{activeColor.name}</span>
+              <span className="font-semibold text-zinc-100 text-sm truncate">
+                {activeColor.name}
+              </span>
               <span className="font-mono text-xs text-amber-400 bg-[#16161a] px-1.5 py-0.5 rounded border border-[#303038]">
                 LDraw #{activeColor.code}
               </span>
@@ -71,39 +98,58 @@ export const ColorPalette: React.FC<ColorPaletteProps> = ({
         )}
       </div>
 
-      {/* Busca e Filtros */}
-      <div className="p-3 border-b border-[#303038] space-y-2">
+      {/* Busca e Filtros Combinados */}
+      <div className="p-3 border-b border-[#303038] space-y-2.5 bg-[#1e1e24]">
+        {/* Barra de Busca por Texto (Nome, ID ou Hex) */}
         <div className="relative">
-          <Search size={14} className="absolute left-2.5 top-2.5 text-zinc-500" />
+          <Search size={14} className="absolute left-2.5 top-2.5 text-zinc-500 pointer-events-none" />
           <input
             type="text"
-            placeholder="Buscar cor LDraw (ex: Red, Blue, Chrome, 14)..."
+            placeholder="Buscar por nome, hex ou código LDraw (ex: Red, #C91A09, 4)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#1b1b20] border border-[#373742] rounded-md pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-amber-500"
+            className="w-full bg-[#16161b] border border-[#34343f] rounded-md pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/40 transition-colors"
           />
         </div>
 
-        <div className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-none text-[11px]">
-          {[
-            { id: 'todos', label: `Todas (${LDRAW_COLORS.length})` },
-            { id: 'solid', label: 'Sólidas' },
-            { id: 'transparent', label: 'Transparentes' },
-            { id: 'metallic', label: 'Metálicas & Chrome' },
-            { id: 'special', label: 'Especiais' },
-          ].map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setCategoryFilter(cat.id)}
-              className={`px-2 py-1 rounded whitespace-nowrap transition-colors font-medium ${
-                categoryFilter === cat.id
-                  ? 'bg-amber-600 text-white shadow-sm'
-                  : 'bg-[#1e1e24] text-zinc-400 hover:text-zinc-200 hover:bg-[#2b2b35]'
-              }`}
+        {/* Seletor <select> de Categorias de Materiais / Acabamentos */}
+        <div className="space-y-1">
+          <div className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider flex items-center justify-between">
+            <span>Categoria / Acabamento</span>
+            <span className="font-mono text-amber-400 text-[10px]">
+              {filteredColors.length} {filteredColors.length === 1 ? 'cor' : 'cores'}
+            </span>
+          </div>
+          <div className="relative">
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="w-full appearance-none bg-[#16161b] hover:bg-[#1a1a20] border border-[#34343f] hover:border-amber-500/40 rounded-md px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/40 cursor-pointer transition-colors pr-8 font-medium shadow-sm"
             >
-              {cat.label}
-            </button>
-          ))}
+              <option value="todos" className="bg-[#1e1e24] text-zinc-200">
+                Todas as Cores ({LDRAW_COLORS.length})
+              </option>
+              <option value="solid" className="bg-[#1e1e24] text-zinc-200">
+                Sólidas
+              </option>
+              <option value="transparent" className="bg-[#1e1e24] text-zinc-200">
+                Transparentes
+              </option>
+              <option value="chrome" className="bg-[#1e1e24] text-zinc-200">
+                Cromadas
+              </option>
+              <option value="pearl" className="bg-[#1e1e24] text-zinc-200">
+                Peroladas
+              </option>
+              <option value="rubber" className="bg-[#1e1e24] text-zinc-200">
+                Borracha
+              </option>
+            </select>
+            <ChevronDown
+              size={13}
+              className="absolute right-2.5 top-2.5 text-zinc-400 pointer-events-none"
+            />
+          </div>
         </div>
       </div>
 
@@ -151,7 +197,7 @@ export const ColorPalette: React.FC<ColorPaletteProps> = ({
 
         {filteredColors.length === 0 && (
           <div className="text-center py-8 text-zinc-500">
-            Nenhuma cor oficial encontrada com "{search}".
+            Nenhuma cor oficial encontrada com os filtros atuais.
           </div>
         )}
       </div>

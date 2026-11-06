@@ -820,6 +820,78 @@ function estimateDimensions(
 }
 
 /**
+ * Determina se a peça é um modelo clássico e fundamental de construção
+ * (ex: Brick 1x1, Brick 2x4, Plate 1x2, Tile 2x2, Slope 45 2x2, etc.)
+ */
+export function isClassicFundamentalPart(part: LegoPartDefinition): boolean {
+  const name = part.name.trim();
+
+  // Peças fundamentais têm padrão limpo "Tipo X x Z" sem qualificadores complexos
+  const classicPattern =
+    /^(?:Brick|Plate|Tile|Slope|Technic Brick|Technic Beam|Cone|Cylinder|Round|Baseplate)\s+(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)(?:\s*x\s*(\d+(?:\.\d+)?))?(?:\s*(?:with Groove|without Groove))?$/i;
+
+  if (classicPattern.test(name)) return true;
+
+  // Lista curada de IDs canônicos fundamentais da Lego
+  const classicIds = new Set([
+    '3005', '3004', '3622', '3010', '3009', '3008', // Bricks 1xN
+    '3003', '3002', '3001', '2456', '3007',         // Bricks 2xN
+    '3024', '3023', '3623', '3710', '3666', '3460', // Plates 1xN
+    '3022', '3021', '3020', '3795', '3034',         // Plates 2xN
+    '3031', '3032', '3035',                         // Plates 4xN
+    '3070b', '3069b', '63864', '2431', '6636', '3068b', '87079', // Tiles
+    '4073', '3062b', '4032', '3941', '98138', '14769', // Rounds
+    '54200', '3040b', '3039', '3037', '4286', '3298', // Slopes
+    '3700', '3701', '3894', '3702', // Technic Bricks
+    '3626b', '973', '970c00', // Minifig fundamental
+  ]);
+
+  return classicIds.has(part.id.toLowerCase());
+}
+
+/**
+ * Ordenação inteligente de peças por relevância e dimensões lógicas:
+ * 1. Peças clássicas e fundamentais de menor para maior primeiro
+ *    (ex.: Brick 1x1, Brick 1x2, Brick 1x3, Brick 1x4, Brick 2x2, Brick 2x4...).
+ * 2. Variações especiais em ordem alfabética do nome oficial.
+ */
+export function comparePartsByRelevance(a: LegoPartDefinition, b: LegoPartDefinition): number {
+  const aFund = isClassicFundamentalPart(a);
+  const bFund = isClassicFundamentalPart(b);
+
+  if (aFund && !bFund) return -1;
+  if (!aFund && bFund) return 1;
+
+  if (aFund && bFund) {
+    const aDimMin = Math.min(a.dimensions.studsX || 1, a.dimensions.studsZ || 1);
+    const aDimMax = Math.max(a.dimensions.studsX || 1, a.dimensions.studsZ || 1);
+    const bDimMin = Math.min(b.dimensions.studsX || 1, b.dimensions.studsZ || 1);
+    const bDimMax = Math.max(b.dimensions.studsX || 1, b.dimensions.studsZ || 1);
+
+    // 1º Critério: Menor dimensão (largura menor primeiro: 1x... antes de 2x...)
+    if (aDimMin !== bDimMin) {
+      return aDimMin - bDimMin;
+    }
+    // 2º Critério: Maior dimensão (comprimento menor primeiro: 1x1 antes de 1x2...)
+    if (aDimMax !== bDimMax) {
+      return aDimMax - bDimMax;
+    }
+    // 3º Critério: Altura (Plate antes de Brick)
+    const aHeight = a.dimensions.heightPlates || 3;
+    const bHeight = b.dimensions.heightPlates || 3;
+    if (aHeight !== bHeight) {
+      return aHeight - bHeight;
+    }
+  }
+
+  // Variações especiais: ordenação alfabética pelo nome oficial
+  const nameCmp = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+  if (nameCmp !== 0) return nameCmp;
+
+  return a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+/**
  * Faz o parse de um arquivo parts.lst oficial do LDraw alocando rigorosamente cada peça
  * na sua respectiva subcategoria oficial LDraw e ignorando aliases.
  */
@@ -902,6 +974,9 @@ export function parsePartsLst(content: string): LegoPartDefinition[] {
     result.push(partDef);
   }
 
+  // Ordenação inteligente de peças por relevância e dimensões lógicas
+  result.sort(comparePartsByRelevance);
+
   return result;
 }
 
@@ -952,7 +1027,7 @@ export async function getPartsCatalog(): Promise<LegoPartDefinition[]> {
               map.set(p.id.toLowerCase(), { ...p, category: cat });
             }
           });
-          const merged = Array.from(map.values());
+          const merged = Array.from(map.values()).sort(comparePartsByRelevance);
           console.log(`[LDraw Catalog] Carregadas ${merged.length} peças via parts-catalog.json.`);
           merged.forEach((p) => partMap.set(p.id.toLowerCase(), p));
           cachedCatalog = merged;
@@ -963,10 +1038,11 @@ export async function getPartsCatalog(): Promise<LegoPartDefinition[]> {
       console.warn('[LDraw Catalog] Aviso ao carregar parts-catalog.json:', err);
     }
 
-    // 3. Fallback final: usar o catálogo interno estático de alta fidelidade
+    // 3. Fallback final: usar o catálogo interno estático de alta fidelidade ordenado
     console.info('[LDraw Catalog] Usando catálogo interno curado.');
-    cachedCatalog = LEGO_PARTS_CATALOG;
-    return LEGO_PARTS_CATALOG;
+    const sortedDefault = [...LEGO_PARTS_CATALOG].sort(comparePartsByRelevance);
+    cachedCatalog = sortedDefault;
+    return sortedDefault;
   })();
 
   return catalogPromise;

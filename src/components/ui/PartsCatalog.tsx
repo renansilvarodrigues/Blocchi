@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, Box, ChevronDown, MousePointerClick, Sparkles, Database } from 'lucide-react';
-import { getPartsCatalog } from '../../ldraw/partsCatalogService';
+import { getPartsCatalog, comparePartsByRelevance } from '../../ldraw/partsCatalogService';
 import { LEGO_PARTS_CATALOG } from '../../ldraw/partsData';
 import type { LegoPartDefinition } from '../../types/lego';
 
@@ -88,7 +88,9 @@ export const PartsCatalog: React.FC<PartsCatalogProps> = ({
 }) => {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
-  const [allParts, setAllParts] = useState<LegoPartDefinition[]>(LEGO_PARTS_CATALOG);
+  const [allParts, setAllParts] = useState<LegoPartDefinition[]>(() =>
+    [...LEGO_PARTS_CATALOG].sort(comparePartsByRelevance)
+  );
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [displayLimit, setDisplayLimit] = useState<number>(40);
 

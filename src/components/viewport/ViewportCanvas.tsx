@@ -604,8 +604,11 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
         brickMesh.rotation.set(...brick.rotation);
 
         brickMesh.traverse((child) => {
-          if ((child as THREE.LineSegments).isLineSegments) {
-            child.visible = settings.showOutlines;
+          if ((child as THREE.LineSegments).isLineSegments || (child as THREE.Line).isLine) {
+            child.visible =
+              engineMode === 'ldraw'
+                ? settings.showOutlines
+                : settings.shadingMode === 'wireframe';
           }
         });
 

@@ -169,6 +169,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
             onDuplicateSelected={onDuplicateSelected}
             onDeleteSelected={onDeleteSelected}
             onSnapToStuds={onSnapToStuds}
+            onSelectColor={onSelectColor}
           />
         )}
       </div>
