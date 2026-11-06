@@ -10,18 +10,75 @@ interface PartsCatalogProps {
   placingPartId?: string | null;
 }
 
+/**
+ * Taxonomia oficial rigorosa das 63 categorias oficiais do ecossistema LDraw
+ * (excluindo explicitamente "Other Compatible Products")
+ */
 const CATEGORIES_LIST: Array<{ key: string; label: string; icon: string }> = [
   { key: 'Todos', label: 'Todas as Categorias', icon: '📂' },
-  { key: 'Bricks', label: 'Bricks (Blocos Padrão)', icon: '🧱' },
-  { key: 'Plates', label: 'Plates (Placas)', icon: '🟩' },
-  { key: 'Tiles', label: 'Tiles (Ladrilhos Lisos)', icon: '🟨' },
-  { key: 'Slopes', label: 'Slopes (Rampas & Invertidas)', icon: '📐' },
-  { key: 'Technic', label: 'Technic (Vigas, Eixos & Pinos)', icon: '⚙️' },
-  { key: 'Rounds', label: 'Rounds (Cilíndricas & Cones)', icon: '⚪' },
-  { key: 'Panels', label: 'Panels (Painéis & Pára-brisas)', icon: '🚪' },
-  { key: 'Minifig', label: 'Minifig (Minifiguras & Acessórios)', icon: '👤' },
-  { key: 'Baseplates', label: 'Baseplates (Placas de Base)', icon: '🗺️' },
-  { key: 'Special', label: 'Special (Dobradiças & Flexíveis)', icon: '✨' },
+  { key: 'Animals And Accessories For Animals', label: 'Animals And Accessories For Animals', icon: '🐾' },
+  { key: 'Beams', label: 'Beams', icon: '⚙️' },
+  { key: 'Beams - Ball & Ball Cup', label: 'Beams - Ball & Ball Cup', icon: '⚙️' },
+  { key: 'Beams - Half', label: 'Beams - Half', icon: '⚙️' },
+  { key: 'Beams - Half - Special', label: 'Beams - Half - Special', icon: '⚙️' },
+  { key: 'Beams - Panels', label: 'Beams - Panels', icon: '⚙️' },
+  { key: 'Beams - Special', label: 'Beams - Special', icon: '⚙️' },
+  { key: 'Bricks', label: 'Bricks', icon: '🧱' },
+  { key: 'Bricks - Bows', label: 'Bricks - Bows', icon: '🧱' },
+  { key: 'Bricks - Sloping', label: 'Bricks - Sloping', icon: '📐' },
+  { key: 'Bricks - Special', label: 'Bricks - Special', icon: '🧱' },
+  { key: 'Bricks - Special - Angles', label: 'Bricks - Special - Angles', icon: '📐' },
+  { key: 'Bricks - Special - Bows', label: 'Bricks - Special - Bows', icon: '🧱' },
+  { key: 'Bricks - Special - Circles', label: 'Bricks - Special - Circles', icon: '⚪' },
+  { key: 'Bricks - Special - Ø4.85', label: 'Bricks - Special - Ø4.85', icon: '⚙️' },
+  { key: 'Bricks - Special - Sloping', label: 'Bricks - Special - Sloping', icon: '📐' },
+  { key: 'Connectors', label: 'Connectors', icon: '🔗' },
+  { key: 'Construction', label: 'Construction', icon: '🏗️' },
+  { key: 'Cranes And Scaffold', label: 'Cranes And Scaffold', icon: '🏗️' },
+  { key: 'Decoration Elements', label: 'Decoration Elements', icon: '✨' },
+  { key: 'Doors & Windows', label: 'Doors & Windows', icon: '🚪' },
+  { key: 'Electric Parts', label: 'Electric Parts', icon: '⚡' },
+  { key: 'Fences And Ladders', label: 'Fences And Ladders', icon: '🪜' },
+  { key: 'Food Stuff', label: 'Food Stuff', icon: '🍎' },
+  { key: 'Functionnal Elements', label: 'Functionnal Elements', icon: '🧲' },
+  { key: 'Functionnal Elements - Gear Wheels And Racks', label: 'Functionnal Elements - Gear Wheels And Racks', icon: '⚙️' },
+  { key: 'Interior', label: 'Interior', icon: '🪑' },
+  { key: 'Minifigures', label: 'Minifigures', icon: '👤' },
+  { key: 'Minifigures - Accessories', label: 'Minifigures - Accessories', icon: '🎒' },
+  { key: 'Minifigures - Accessories In Hand', label: 'Minifigures - Accessories In Hand', icon: '🪄' },
+  { key: 'Minifigures - Hairs', label: 'Minifigures - Hairs', icon: '💇' },
+  { key: 'Minifigures - Head Clothing', label: 'Minifigures - Head Clothing', icon: '👒' },
+  { key: 'Minifigures - Heads', label: 'Minifigures - Heads', icon: '😀' },
+  { key: 'Minifigures - Lower Parts', label: 'Minifigures - Lower Parts', icon: '👖' },
+  { key: 'Minifigures - Upper Parts', label: 'Minifigures - Upper Parts', icon: '👕' },
+  { key: 'Minifigures - Weapons', label: 'Minifigures - Weapons', icon: '⚔️' },
+  { key: 'Plants', label: 'Plants', icon: '🌿' },
+  { key: 'Plates', label: 'Plates', icon: '🟩' },
+  { key: 'Plates - Baseplates', label: 'Plates - Baseplates', icon: '🗺️' },
+  { key: 'Plates - Flat Tiles', label: 'Plates - Flat Tiles', icon: '🟨' },
+  { key: 'Plates - Special', label: 'Plates - Special', icon: '🟩' },
+  { key: 'Plates - Special - Angles', label: 'Plates - Special - Angles', icon: '📐' },
+  { key: 'Plates - Special - Circles', label: 'Plates - Special - Circles', icon: '⚪' },
+  { key: 'Plates - Specials - Flat', label: 'Plates - Specials - Flat', icon: '🟨' },
+  { key: 'Rubbers And Strings', label: 'Rubbers And Strings', icon: '🪢' },
+  { key: 'Signs And Flags', label: 'Signs And Flags', icon: '🚩' },
+  { key: 'Slides & Rails', label: 'Slides & Rails', icon: '🎢' },
+  { key: 'Stickers', label: 'Stickers', icon: '🏷️' },
+  { key: 'Support', label: 'Support', icon: '🏛️' },
+  { key: 'Textiles', label: 'Textiles', icon: '🧵' },
+  { key: 'Transportation - Aviation', label: 'Transportation - Aviation', icon: '✈️' },
+  { key: 'Transportation - Boats', label: 'Transportation - Boats', icon: '⛵' },
+  { key: 'Transportation - Trains', label: 'Transportation - Trains', icon: '🚂' },
+  { key: 'Transportation - Vehicles', label: 'Transportation - Vehicles', icon: '🚗' },
+  { key: 'Tubes', label: 'Tubes', icon: '🧪' },
+  { key: 'Tyres And Rims - Ø3.2', label: 'Tyres And Rims - Ø3.2', icon: '🛞' },
+  { key: 'Tyres And Rims - Ø4.85', label: 'Tyres And Rims - Ø4.85', icon: '🛞' },
+  { key: 'Tyres And Rims - Special', label: 'Tyres And Rims - Special', icon: '🛞' },
+  { key: 'Various Parts', label: 'Various Parts', icon: '📦' },
+  { key: 'Wall & Roof Elements', label: 'Wall & Roof Elements', icon: '🏠' },
+  { key: 'Wheel Based', label: 'Wheel Based', icon: '🏎️' },
+  { key: 'Wheel Bases', label: 'Wheel Bases', icon: '🏎️' },
+  { key: 'Windscreens And Cockpits', label: 'Windscreens And Cockpits', icon: '🪟' },
 ];
 
 export const PartsCatalog: React.FC<PartsCatalogProps> = ({
@@ -128,7 +185,7 @@ export const PartsCatalog: React.FC<PartsCatalogProps> = ({
         {/* Seletor Oficial de Taxonomia LDraw */}
         <div className="space-y-1">
           <div className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider flex items-center justify-between">
-            <span>Categoria LDraw</span>
+            <span>Categoria Oficial LDraw</span>
             <span className="font-mono text-amber-400 text-[10px]">
               {filteredParts.length.toLocaleString('pt-BR')} {filteredParts.length === 1 ? 'peça' : 'peças'}
             </span>

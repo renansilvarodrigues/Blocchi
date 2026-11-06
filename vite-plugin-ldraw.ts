@@ -50,7 +50,12 @@ export function ldrawVitePlugin(): Plugin {
           .toString('utf8')
           .trim();
         const desc = line1.replace(/^0\s+/, '').trim();
-        if (desc) {
+        if (
+          desc &&
+          !desc.startsWith('~') &&
+          !desc.startsWith('_Moved') &&
+          !desc.toLowerCase().includes('other compatible')
+        ) {
           lines.push(`${filename}\t${desc}`);
         }
       }

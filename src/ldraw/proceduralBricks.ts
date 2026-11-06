@@ -89,7 +89,7 @@ export function createBrickMesh(
   const length = studsZ * STUD_SPACING; // Z
 
   // 2. Baseplates
-  if (part.category === 'Baseplates') {
+  if (part.category === 'Plates - Baseplates' || (part.category as string) === 'Baseplates') {
     const baseGeo = new THREE.BoxGeometry(width, height, length);
     baseGeo.translate(0, height / 2, 0);
     baseGeo.computeVertexNormals();
@@ -104,7 +104,7 @@ export function createBrickMesh(
     group.add(edges);
   }
   // 3. Peças Cilíndricas / Rounds (Snap Centralizado Universal)
-  else if (part.category === 'Rounds') {
+  else if (part.category.includes('Circles') || (part.category as string) === 'Rounds') {
     const radius = Math.min(width, length) / 2;
 
     if (part.name.toLowerCase().includes('cone')) {
@@ -135,7 +135,7 @@ export function createBrickMesh(
     }
   }
   // 4. Slopes & Inverted Slopes (Rampas)
-  else if (part.category === 'Slopes') {
+  else if (part.category.includes('Sloping') || (part.category as string) === 'Slopes') {
     if (part.isInvertedSlope) {
       // Rampa Invertida: corte inclinado na base, topo plano retangular com pinos
       const invShape = new THREE.Shape();
@@ -190,7 +190,7 @@ export function createBrickMesh(
     }
   }
   // 5. Technic Pins (Conectores Cilíndricos)
-  else if (part.category === 'Technic' && (part.id === '2780' || part.id === '3673' || part.id === '6558' || part.id === '32054')) {
+  else if ((part.category.includes('Connectors') || (part.category as string) === 'Technic') && (part.id === '2780' || part.id === '3673' || part.id === '6558' || part.id === '32054')) {
     const pinLen = length;
     const pinGeo = new THREE.CylinderGeometry(TECHNIC_HOLE_RADIUS * 0.96, TECHNIC_HOLE_RADIUS * 0.96, pinLen, 16);
     pinGeo.rotateX(Math.PI / 2);
@@ -303,7 +303,7 @@ export function createBrickMesh(
     }
 
     // Furos laterais Technic (se for bloco Technic com furos)
-    if (part.category === 'Technic' && (part.id === '3700' || part.id === '3701' || part.id === '3894' || part.id === '3702')) {
+    if ((part.category.includes('Ø4.85') || (part.category as string) === 'Technic') && (part.id === '3700' || part.id === '3701' || part.id === '3894' || part.id === '3702')) {
       const holes = getTechnicBrickHoles(part);
       const holeMeshGeo = new THREE.CylinderGeometry(TECHNIC_HOLE_RADIUS, TECHNIC_HOLE_RADIUS, width * 1.02, 16);
       holeMeshGeo.rotateZ(Math.PI / 2);
@@ -329,7 +329,7 @@ export function createBrickMesh(
     studGeo.computeVertexNormals();
     const studEdgesGeo = new THREE.EdgesGeometry(studGeo, 30);
 
-    if (part.category === 'Rounds' && studsX === 1 && studsZ === 1) {
+    if ((part.category.includes('Circles') || (part.category as string) === 'Rounds') && studsX === 1 && studsZ === 1) {
       const studMesh = new THREE.Mesh(studGeo, plasticMaterial);
       studMesh.position.set(0, 0, 0);
       studMesh.castShadow = true;
@@ -340,7 +340,7 @@ export function createBrickMesh(
       studLine.position.set(0, 0, 0);
       studLine.name = 'edge_lines';
       group.add(studLine);
-    } else if (part.category === 'Slopes') {
+    } else if (part.category.includes('Sloping') || (part.category as string) === 'Slopes') {
       // Em rampas (Slopes), pinos só ficam no platô superior (não descem pela rampa)
       if (studsZ >= 2) {
         const startX = -((studsX - 1) * STUD_SPACING) / 2;
@@ -390,7 +390,7 @@ export function createBrickMesh(
  * Retorna as coordenadas locais [x, y, z] dos furos laterais de uma peça Technic
  */
 export function getTechnicBrickHoles(part: LegoPartDefinition): Array<{ x: number; y: number; z: number }> {
-  if (part.category !== 'Technic') return [];
+  if (!part.category.includes('Connectors') && !part.category.includes('Beams') && !part.category.includes('Ø4.85') && (part.category as string) !== 'Technic') return [];
   const holes: Array<{ x: number; y: number; z: number }> = [];
   const holeY = TECHNIC_HOLE_HEIGHT;
 
@@ -442,12 +442,12 @@ export function getBrickStudWorldCoords(
   partDef: LegoPartDefinition
 ): Array<[number, number]> {
   // Se for peça Round 1x1, tem pino único centralizado
-  if (partDef.category === 'Rounds' && partDef.dimensions.studsX === 1 && partDef.dimensions.studsZ === 1) {
+  if ((partDef.category.includes('Circles') || (partDef.category as string) === 'Rounds') && partDef.dimensions.studsX === 1 && partDef.dimensions.studsZ === 1) {
     return [[brick.position[0], brick.position[2]]];
   }
 
   // Se for rampa / slope, pinos ficam restritos ao topo horizontal
-  if (partDef.category === 'Slopes') {
+  if (partDef.category.includes('Sloping') || (partDef.category as string) === 'Slopes') {
     if (!partDef.hasStuds) return [];
     const { effX } = getEffectiveStudDimensions(partDef, brick.rotation[1]);
     const startX = brick.position[0] - ((effX - 1) * STUD_SPACING) / 2;
@@ -492,10 +492,10 @@ export function snapToUnderlyingStuds(
 
   // 1. Suporte especial para Technic: pinos encaixando em furos laterais
   const isTechnicPin =
-    partDef.category === 'Technic' &&
+    (partDef.category.includes('Connectors') || (partDef.category as string) === 'Technic') &&
     (partDef.id === '2780' || partDef.id === '3673' || partDef.id === '6558');
   const isTechnicBrick =
-    underlyingDef.category === 'Technic' &&
+    (underlyingDef.category.includes('Ø4.85') || (underlyingDef.category as string) === 'Technic') &&
     (underlyingDef.id === '3700' || underlyingDef.id === '3701' || underlyingDef.id === '3894' || underlyingDef.id === '3702');
 
   if (isTechnicPin && isTechnicBrick) {
@@ -535,7 +535,7 @@ export function snapToUnderlyingStuds(
   }
 
   // 3. Peças Round (Cilíndricas) 1x1: Snap centralizado exato no eixo do pino
-  if (partDef.category === 'Rounds' && partDef.dimensions.studsX === 1 && partDef.dimensions.studsZ === 1) {
+  if ((partDef.category.includes('Circles') || (partDef.category as string) === 'Rounds') && partDef.dimensions.studsX === 1 && partDef.dimensions.studsZ === 1) {
     const underStuds = getBrickStudWorldCoords(underlyingBrick, underlyingDef);
     let bestX = underStuds[0]?.[0] ?? pos[0];
     let bestZ = underStuds[0]?.[1] ?? pos[2];
@@ -613,7 +613,7 @@ export function calculateLDrawStudSnap(
   let snappedX = Math.round(pos[0] / step) * step;
   let snappedZ = Math.round(pos[2] / step) * step;
 
-  if (part && part.category === 'Rounds' && part.dimensions.studsX === 1 && part.dimensions.studsZ === 1) {
+  if (part && (part.category.includes('Circles') || (part.category as string) === 'Rounds') && part.dimensions.studsX === 1 && part.dimensions.studsZ === 1) {
     // Alinhamento exato no centro do grid de pinos
     snappedX = Math.round(pos[0] / STUD_SPACING) * STUD_SPACING;
     snappedZ = Math.round(pos[2] / STUD_SPACING) * STUD_SPACING;

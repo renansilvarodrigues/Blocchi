@@ -28,9 +28,9 @@ export const CURATED_PARTS_LIST = [
   { id: '3008', name: 'Brick 1 x 8', category: 'Bricks', studsX: 1, studsZ: 8, heightPlates: 3, hasStuds: true },
   { id: '2456', name: 'Brick 2 x 6', category: 'Bricks', studsX: 2, studsZ: 6, heightPlates: 3, hasStuds: true },
   { id: '3007', name: 'Brick 2 x 8', category: 'Bricks', studsX: 2, studsZ: 8, heightPlates: 3, hasStuds: true },
-  { id: '2357', name: 'Brick 2 x 2 Corner', category: 'Bricks', studsX: 2, studsZ: 2, heightPlates: 3, hasStuds: true },
-  { id: '6091', name: 'Brick 1 x 2 x 1 1/3 with Curved Top', category: 'Bricks', studsX: 1, studsZ: 2, heightPlates: 4, hasStuds: true },
-  { id: '3659', name: 'Brick 1 x 4 Arch', category: 'Bricks', studsX: 1, studsZ: 4, heightPlates: 3, hasStuds: true },
+  { id: '2357', name: 'Brick 2 x 2 Corner', category: 'Bricks - Special - Angles', studsX: 2, studsZ: 2, heightPlates: 3, hasStuds: true },
+  { id: '6091', name: 'Brick 1 x 2 x 1 1/3 with Curved Top', category: 'Bricks - Bows', studsX: 1, studsZ: 2, heightPlates: 4, hasStuds: true },
+  { id: '3659', name: 'Brick 1 x 4 Arch', category: 'Bricks - Bows', studsX: 1, studsZ: 4, heightPlates: 3, hasStuds: true },
 
   // Plates
   { id: '3024', name: 'Plate 1 x 1', category: 'Plates', studsX: 1, studsZ: 1, heightPlates: 1, hasStuds: true },
@@ -47,148 +47,228 @@ export const CURATED_PARTS_LIST = [
   { id: '3031', name: 'Plate 4 x 4', category: 'Plates', studsX: 4, studsZ: 4, heightPlates: 1, hasStuds: true },
   { id: '3032', name: 'Plate 4 x 6', category: 'Plates', studsX: 4, studsZ: 6, heightPlates: 1, hasStuds: true },
   { id: '3035', name: 'Plate 4 x 8', category: 'Plates', studsX: 4, studsZ: 8, heightPlates: 1, hasStuds: true },
-  { id: '2420', name: 'Plate 2 x 2 Corner', category: 'Plates', studsX: 2, studsZ: 2, heightPlates: 1, hasStuds: true },
+  { id: '2420', name: 'Plate 2 x 2 Corner', category: 'Plates - Special - Angles', studsX: 2, studsZ: 2, heightPlates: 1, hasStuds: true },
 
   // Tiles
-  { id: '3070b', name: 'Tile 1 x 1 with Groove', category: 'Tiles', studsX: 1, studsZ: 1, heightPlates: 1, hasStuds: false },
-  { id: '3069b', name: 'Tile 1 x 2 with Groove', category: 'Tiles', studsX: 1, studsZ: 2, heightPlates: 1, hasStuds: false },
-  { id: '63864', name: 'Tile 1 x 3', category: 'Tiles', studsX: 1, studsZ: 3, heightPlates: 1, hasStuds: false },
-  { id: '2431', name: 'Tile 1 x 4 with Groove', category: 'Tiles', studsX: 1, studsZ: 4, heightPlates: 1, hasStuds: false },
-  { id: '6636', name: 'Tile 1 x 6 with Groove', category: 'Tiles', studsX: 1, studsZ: 6, heightPlates: 1, hasStuds: false },
-  { id: '3068b', name: 'Tile 2 x 2 with Groove', category: 'Tiles', studsX: 2, studsZ: 2, heightPlates: 1, hasStuds: false },
-  { id: '87079', name: 'Tile 2 x 4 with Groove', category: 'Tiles', studsX: 2, studsZ: 4, heightPlates: 1, hasStuds: false },
+  { id: '3070b', name: 'Tile 1 x 1 with Groove', category: 'Plates - Specials - Flat', studsX: 1, studsZ: 1, heightPlates: 1, hasStuds: false },
+  { id: '3069b', name: 'Tile 1 x 2 with Groove', category: 'Plates - Specials - Flat', studsX: 1, studsZ: 2, heightPlates: 1, hasStuds: false },
+  { id: '63864', name: 'Tile 1 x 3', category: 'Plates - Flat Tiles', studsX: 1, studsZ: 3, heightPlates: 1, hasStuds: false },
+  { id: '2431', name: 'Tile 1 x 4 with Groove', category: 'Plates - Specials - Flat', studsX: 1, studsZ: 4, heightPlates: 1, hasStuds: false },
+  { id: '6636', name: 'Tile 1 x 6 with Groove', category: 'Plates - Specials - Flat', studsX: 1, studsZ: 6, heightPlates: 1, hasStuds: false },
+  { id: '3068b', name: 'Tile 2 x 2 with Groove', category: 'Plates - Specials - Flat', studsX: 2, studsZ: 2, heightPlates: 1, hasStuds: false },
+  { id: '87079', name: 'Tile 2 x 4 with Groove', category: 'Plates - Specials - Flat', studsX: 2, studsZ: 4, heightPlates: 1, hasStuds: false },
 
   // Slopes (Rampas / Inclinadas)
-  { id: '54200', name: 'Slope 31 1 x 1 x 2/3 (Cheese)', category: 'Slopes', studsX: 1, studsZ: 1, heightPlates: 2, hasStuds: false },
-  { id: '3040b', name: 'Slope 45 2 x 1', category: 'Slopes', studsX: 1, studsZ: 2, heightPlates: 3, hasStuds: true },
-  { id: '3039', name: 'Slope 45 2 x 2', category: 'Slopes', studsX: 2, studsZ: 2, heightPlates: 3, hasStuds: true },
-  { id: '3037', name: 'Slope 45 2 x 4', category: 'Slopes', studsX: 2, studsZ: 4, heightPlates: 3, hasStuds: true },
-  { id: '4286', name: 'Slope 33 3 x 1', category: 'Slopes', studsX: 1, studsZ: 3, heightPlates: 3, hasStuds: true },
-  { id: '3298', name: 'Slope 33 3 x 2', category: 'Slopes', studsX: 2, studsZ: 3, heightPlates: 3, hasStuds: true },
-  { id: '3665', name: 'Slope 45 2 x 1 Inverted', category: 'Slopes', studsX: 1, studsZ: 2, heightPlates: 3, hasStuds: true },
-  { id: '3660', name: 'Slope 45 2 x 2 Inverted', category: 'Slopes', studsX: 2, studsZ: 2, heightPlates: 3, hasStuds: true },
-  { id: '60481', name: 'Slope 65 2 x 1 x 2', category: 'Slopes', studsX: 1, studsZ: 2, heightPlates: 6, hasStuds: true },
-  { id: '85984', name: 'Slope 30 1 x 2 x 2/3', category: 'Slopes', studsX: 1, studsZ: 2, heightPlates: 2, hasStuds: false },
+  { id: '54200', name: 'Slope 31 1 x 1 x 2/3 (Cheese)', category: 'Bricks - Sloping', studsX: 1, studsZ: 1, heightPlates: 2, hasStuds: false },
+  { id: '3040b', name: 'Slope 45 2 x 1', category: 'Bricks - Sloping', studsX: 1, studsZ: 2, heightPlates: 3, hasStuds: true },
+  { id: '3039', name: 'Slope 45 2 x 2', category: 'Bricks - Sloping', studsX: 2, studsZ: 2, heightPlates: 3, hasStuds: true },
+  { id: '3037', name: 'Slope 45 2 x 4', category: 'Bricks - Sloping', studsX: 2, studsZ: 4, heightPlates: 3, hasStuds: true },
+  { id: '4286', name: 'Slope 33 3 x 1', category: 'Bricks - Sloping', studsX: 1, studsZ: 3, heightPlates: 3, hasStuds: true },
+  { id: '3298', name: 'Slope 33 3 x 2', category: 'Bricks - Sloping', studsX: 2, studsZ: 3, heightPlates: 3, hasStuds: true },
+  { id: '3665', name: 'Slope 45 2 x 1 Inverted', category: 'Bricks - Special - Sloping', studsX: 1, studsZ: 2, heightPlates: 3, hasStuds: true },
+  { id: '3660', name: 'Slope 45 2 x 2 Inverted', category: 'Bricks - Special - Sloping', studsX: 2, studsZ: 2, heightPlates: 3, hasStuds: true },
+  { id: '60481', name: 'Slope 65 2 x 1 x 2', category: 'Bricks - Sloping', studsX: 1, studsZ: 2, heightPlates: 6, hasStuds: true },
+  { id: '85984', name: 'Slope 30 1 x 2 x 2/3', category: 'Bricks - Sloping', studsX: 1, studsZ: 2, heightPlates: 2, hasStuds: false },
 
   // Rounds (Cilíndricas)
-  { id: '4073', name: 'Plate 1 x 1 Round', category: 'Rounds', studsX: 1, studsZ: 1, heightPlates: 1, hasStuds: true },
-  { id: '3062b', name: 'Brick 1 x 1 Round with Hollow Stud', category: 'Rounds', studsX: 1, studsZ: 1, heightPlates: 3, hasStuds: true },
-  { id: '4032', name: 'Plate 2 x 2 Round', category: 'Rounds', studsX: 2, studsZ: 2, heightPlates: 1, hasStuds: true },
-  { id: '3941', name: 'Brick 2 x 2 Round', category: 'Rounds', studsX: 2, studsZ: 2, heightPlates: 3, hasStuds: true },
-  { id: '98138', name: 'Tile 1 x 1 Round', category: 'Rounds', studsX: 1, studsZ: 1, heightPlates: 1, hasStuds: false },
-  { id: '14769', name: 'Tile 2 x 2 Round', category: 'Rounds', studsX: 2, studsZ: 2, heightPlates: 1, hasStuds: false },
-  { id: '4589b', name: 'Cone 1 x 1 with Top Groove', category: 'Rounds', studsX: 1, studsZ: 1, heightPlates: 3, hasStuds: true },
-  { id: '3942c', name: 'Cone 2 x 2 x 2 with Open Stud', category: 'Rounds', studsX: 2, studsZ: 2, heightPlates: 6, hasStuds: true },
-  { id: '3960', name: 'Dish 4 x 4 Inverted (Radar)', category: 'Rounds', studsX: 4, studsZ: 4, heightPlates: 3, hasStuds: true },
+  { id: '4073', name: 'Plate 1 x 1 Round', category: 'Plates - Special - Circles', studsX: 1, studsZ: 1, heightPlates: 1, hasStuds: true },
+  { id: '3062b', name: 'Brick 1 x 1 Round with Hollow Stud', category: 'Bricks - Special - Circles', studsX: 1, studsZ: 1, heightPlates: 3, hasStuds: true },
+  { id: '4032', name: 'Plate 2 x 2 Round', category: 'Plates - Special - Circles', studsX: 2, studsZ: 2, heightPlates: 1, hasStuds: true },
+  { id: '3941', name: 'Brick 2 x 2 Round', category: 'Bricks - Special - Circles', studsX: 2, studsZ: 2, heightPlates: 3, hasStuds: true },
+  { id: '98138', name: 'Tile 1 x 1 Round', category: 'Plates - Specials - Flat', studsX: 1, studsZ: 1, heightPlates: 1, hasStuds: false },
+  { id: '14769', name: 'Tile 2 x 2 Round', category: 'Plates - Specials - Flat', studsX: 2, studsZ: 2, heightPlates: 1, hasStuds: false },
+  { id: '4589b', name: 'Cone 1 x 1 with Top Groove', category: 'Bricks - Special - Circles', studsX: 1, studsZ: 1, heightPlates: 3, hasStuds: true },
+  { id: '3942c', name: 'Cone 2 x 2 x 2 with Open Stud', category: 'Bricks - Special - Circles', studsX: 2, studsZ: 2, heightPlates: 6, hasStuds: true },
+  { id: '3960', name: 'Dish 4 x 4 Inverted (Radar)', category: 'Various Parts', studsX: 4, studsZ: 4, heightPlates: 3, hasStuds: true },
 
   // Technic
-  { id: '3700', name: 'Technic Brick 1 x 2 with Hole', category: 'Technic', studsX: 1, studsZ: 2, heightPlates: 3, hasStuds: true },
-  { id: '3701', name: 'Technic Brick 1 x 4 with 3 Holes', category: 'Technic', studsX: 1, studsZ: 4, heightPlates: 3, hasStuds: true },
-  { id: '3894', name: 'Technic Brick 1 x 6 with 5 Holes', category: 'Technic', studsX: 1, studsZ: 6, heightPlates: 3, hasStuds: true },
-  { id: '3702', name: 'Technic Brick 1 x 8 with 7 Holes', category: 'Technic', studsX: 1, studsZ: 8, heightPlates: 3, hasStuds: true },
-  { id: '2780', name: 'Technic Pin with Friction Ridges', category: 'Technic', studsX: 1, studsZ: 2, heightPlates: 1, hasStuds: false },
-  { id: '3673', name: 'Technic Pin without Friction', category: 'Technic', studsX: 1, studsZ: 2, heightPlates: 1, hasStuds: false },
-  { id: '6558', name: 'Technic Pin Long with Friction', category: 'Technic', studsX: 1, studsZ: 3, heightPlates: 1, hasStuds: false },
-  { id: '32054', name: 'Technic Pin 3L with Stop Bush', category: 'Technic', studsX: 1, studsZ: 3, heightPlates: 1, hasStuds: false },
-  { id: '3705', name: 'Technic Axle 4L', category: 'Technic', studsX: 1, studsZ: 4, heightPlates: 1, hasStuds: false },
-  { id: '3706', name: 'Technic Axle 6L', category: 'Technic', studsX: 1, studsZ: 6, heightPlates: 1, hasStuds: false },
-  { id: '32523', name: 'Technic Beam 1 x 3 Thick', category: 'Technic', studsX: 1, studsZ: 3, heightPlates: 2.5, hasStuds: false },
-  { id: '32524', name: 'Technic Beam 1 x 7 Thick', category: 'Technic', studsX: 1, studsZ: 7, heightPlates: 2.5, hasStuds: false },
+  { id: '3700', name: 'Technic Brick 1 x 2 with Hole', category: 'Bricks - Special - Ø4.85', studsX: 1, studsZ: 2, heightPlates: 3, hasStuds: true },
+  { id: '3701', name: 'Technic Brick 1 x 4 with 3 Holes', category: 'Bricks - Special - Ø4.85', studsX: 1, studsZ: 4, heightPlates: 3, hasStuds: true },
+  { id: '3894', name: 'Technic Brick 1 x 6 with 5 Holes', category: 'Bricks - Special - Ø4.85', studsX: 1, studsZ: 6, heightPlates: 3, hasStuds: true },
+  { id: '3702', name: 'Technic Brick 1 x 8 with 7 Holes', category: 'Bricks - Special - Ø4.85', studsX: 1, studsZ: 8, heightPlates: 3, hasStuds: true },
+  { id: '2780', name: 'Technic Pin with Friction Ridges', category: 'Connectors', studsX: 1, studsZ: 2, heightPlates: 1, hasStuds: false },
+  { id: '3673', name: 'Technic Pin without Friction', category: 'Connectors', studsX: 1, studsZ: 2, heightPlates: 1, hasStuds: false },
+  { id: '6558', name: 'Technic Pin Long with Friction', category: 'Connectors', studsX: 1, studsZ: 3, heightPlates: 1, hasStuds: false },
+  { id: '32054', name: 'Technic Pin 3L with Stop Bush', category: 'Plants', studsX: 1, studsZ: 3, heightPlates: 1, hasStuds: false },
+  { id: '3705', name: 'Technic Axle 4L', category: 'Connectors', studsX: 1, studsZ: 4, heightPlates: 1, hasStuds: false },
+  { id: '3706', name: 'Technic Axle 6L', category: 'Connectors', studsX: 1, studsZ: 6, heightPlates: 1, hasStuds: false },
+  { id: '32523', name: 'Technic Beam 1 x 3 Thick', category: 'Beams', studsX: 1, studsZ: 3, heightPlates: 2.5, hasStuds: false },
+  { id: '32524', name: 'Technic Beam 1 x 7 Thick', category: 'Beams', studsX: 1, studsZ: 7, heightPlates: 2.5, hasStuds: false },
 
   // Panels
-  { id: '4865', name: 'Panel 1 x 2 x 1', category: 'Panels', studsX: 1, studsZ: 2, heightPlates: 3, hasStuds: true },
-  { id: '2362a', name: 'Panel 1 x 2 x 3 with Hollow Studs', category: 'Panels', studsX: 1, studsZ: 2, heightPlates: 9, hasStuds: true },
-  { id: '60581', name: 'Panel 1 x 4 x 3', category: 'Panels', studsX: 1, studsZ: 4, heightPlates: 9, hasStuds: true },
-  { id: '3823', name: 'Windscreen 2 x 4 x 2', category: 'Panels', studsX: 2, studsZ: 4, heightPlates: 6, hasStuds: true },
-  { id: '3853', name: 'Window 1 x 4 x 3', category: 'Panels', studsX: 1, studsZ: 4, heightPlates: 9, hasStuds: true },
+  { id: '4865', name: 'Panel 1 x 2 x 1', category: 'Various Parts', studsX: 1, studsZ: 2, heightPlates: 3, hasStuds: true },
+  { id: '2362a', name: 'Panel 1 x 2 x 3 with Hollow Studs', category: 'Various Parts', studsX: 1, studsZ: 2, heightPlates: 9, hasStuds: true },
+  { id: '60581', name: 'Panel 1 x 4 x 3', category: 'Various Parts', studsX: 1, studsZ: 4, heightPlates: 9, hasStuds: true },
+  { id: '3823', name: 'Windscreen 2 x 4 x 2', category: 'Windscreens And Cockpits', studsX: 2, studsZ: 4, heightPlates: 6, hasStuds: true },
+  { id: '3853', name: 'Window 1 x 4 x 3', category: 'Doors & Windows', studsX: 1, studsZ: 4, heightPlates: 9, hasStuds: true },
 
   // Minifig
-  { id: '3626b', name: 'Minifig Head with Hollow Stud', category: 'Minifig', studsX: 1, studsZ: 1, heightPlates: 3.5, hasStuds: true },
-  { id: '973', name: 'Minifig Torso', category: 'Minifig', studsX: 1, studsZ: 2, heightPlates: 4, hasStuds: true },
-  { id: '970c00', name: 'Minifig Hips and Legs', category: 'Minifig', studsX: 1, studsZ: 2, heightPlates: 5, hasStuds: false },
-  { id: '3838', name: 'Minifig Air Tanks', category: 'Minifig', studsX: 1, studsZ: 1, heightPlates: 3, hasStuds: false },
-  { id: '3844', name: 'Minifig Helmet Castle', category: 'Minifig', studsX: 1, studsZ: 1, heightPlates: 3, hasStuds: false },
+  { id: '3626b', name: 'Minifig Head with Hollow Stud', category: 'Minifigures - Heads', studsX: 1, studsZ: 1, heightPlates: 3.5, hasStuds: true },
+  { id: '973', name: 'Minifig Torso', category: 'Minifigures - Upper Parts', studsX: 1, studsZ: 2, heightPlates: 4, hasStuds: true },
+  { id: '970c00', name: 'Minifig Hips and Legs', category: 'Minifigures - Lower Parts', studsX: 1, studsZ: 2, heightPlates: 5, hasStuds: false },
+  { id: '3838', name: 'Minifig Air Tanks', category: 'Minifigures - Accessories', studsX: 1, studsZ: 1, heightPlates: 3, hasStuds: false },
+  { id: '3844', name: 'Minifig Helmet Castle', category: 'Minifigures - Head Clothing', studsX: 1, studsZ: 1, heightPlates: 3, hasStuds: false },
 
   // Baseplates
-  { id: '3867', name: 'Baseplate 16 x 16', category: 'Baseplates', studsX: 16, studsZ: 16, heightPlates: 0.5, hasStuds: true },
-  { id: '3811', name: 'Baseplate 32 x 32', category: 'Baseplates', studsX: 32, studsZ: 32, heightPlates: 0.5, hasStuds: true },
-  { id: '41539', name: 'Plate 8 x 8', category: 'Baseplates', studsX: 8, studsZ: 8, heightPlates: 1, hasStuds: true },
+  { id: '3867', name: 'Baseplate 16 x 16', category: 'Plates - Baseplates', studsX: 16, studsZ: 16, heightPlates: 0.5, hasStuds: true },
+  { id: '3811', name: 'Baseplate 32 x 32', category: 'Plates - Baseplates', studsX: 32, studsZ: 32, heightPlates: 0.5, hasStuds: true },
+  { id: '41539', name: 'Plate 8 x 8', category: 'Plates', studsX: 8, studsZ: 8, heightPlates: 1, hasStuds: true },
 
   // Special & Flexible
-  { id: '4070', name: 'Brick 1 x 1 with Headlight', category: 'Special', studsX: 1, studsZ: 1, heightPlates: 3, hasStuds: true },
-  { id: '4085c', name: 'Plate 1 x 1 with Clip Vertical', category: 'Special', studsX: 1, studsZ: 1, heightPlates: 1, hasStuds: true },
-  { id: '60477', name: 'Plate 1 x 2 with Handle', category: 'Special', studsX: 1, studsZ: 2, heightPlates: 1, hasStuds: true },
-  { id: '3937', name: 'Hinge Brick 1 x 2 Base', category: 'Special', studsX: 1, studsZ: 2, heightPlates: 3, hasStuds: true },
-  { id: '3938', name: 'Hinge Brick 1 x 2 Top', category: 'Special', studsX: 1, studsZ: 2, heightPlates: 3, hasStuds: true },
-  { id: '3680', name: 'Turntable 2 x 2 Plate Base', category: 'Special', studsX: 2, studsZ: 2, heightPlates: 1, hasStuds: true },
-  { id: '14301', name: 'Hose Flexible 11.5L', category: 'Special', studsX: 1, studsZ: 12, heightPlates: 1, hasStuds: false, isFlexible: true },
-  { id: '73590', name: 'Hose Flexible 8.5L', category: 'Special', studsX: 1, studsZ: 9, heightPlates: 1, hasStuds: false, isFlexible: true },
-  { id: '30104', name: 'Chain 21 Links', category: 'Special', studsX: 1, studsZ: 10, heightPlates: 1, hasStuds: false, isFlexible: true },
-  { id: '14696', name: 'Technic Chain Link Reinforced', category: 'Special', studsX: 1, studsZ: 1, heightPlates: 1, hasStuds: false, isFlexible: true },
+  { id: '4070', name: 'Brick 1 x 1 with Headlight', category: 'Bricks - Special', studsX: 1, studsZ: 1, heightPlates: 3, hasStuds: true },
+  { id: '4085c', name: 'Plate 1 x 1 with Clip Vertical', category: 'Plates - Special', studsX: 1, studsZ: 1, heightPlates: 1, hasStuds: true },
+  { id: '60477', name: 'Plate 1 x 2 with Handle', category: 'Plates - Special', studsX: 1, studsZ: 2, heightPlates: 1, hasStuds: true },
+  { id: '3937', name: 'Hinge Brick 1 x 2 Base', category: 'Bricks - Special', studsX: 1, studsZ: 2, heightPlates: 3, hasStuds: true },
+  { id: '3938', name: 'Hinge Brick 1 x 2 Top', category: 'Bricks - Special', studsX: 1, studsZ: 2, heightPlates: 3, hasStuds: true },
+  { id: '3680', name: 'Turntable 2 x 2 Plate Base', category: 'Interior', studsX: 2, studsZ: 2, heightPlates: 1, hasStuds: true },
+  { id: '14301', name: 'Hose Flexible 11.5L', category: 'Tubes', studsX: 1, studsZ: 12, heightPlates: 1, hasStuds: false, isFlexible: true },
+  { id: '73590', name: 'Hose Flexible 8.5L', category: 'Tubes', studsX: 1, studsZ: 9, heightPlates: 1, hasStuds: false, isFlexible: true },
+  { id: '30104', name: 'Chain 21 Links', category: 'Various Parts', studsX: 1, studsZ: 10, heightPlates: 1, hasStuds: false, isFlexible: true },
+  { id: '14696', name: 'Technic Chain Link Reinforced', category: 'Various Parts', studsX: 1, studsZ: 1, heightPlates: 1, hasStuds: false, isFlexible: true },
 ];
 
 /**
  * Normaliza categorias de metadados LDraw para a taxonomia padrão do Blocchi
  */
 export function normalizeCategory(rawCategory, description = '') {
-  const cat = (rawCategory || '').trim().toLowerCase();
-  const desc = (description || '').trim().toLowerCase();
+  const desc = (description || rawCategory || '').trim();
+  const d = desc.toLowerCase();
 
-  // 1. Minifig
-  if (cat.includes('minifig') || cat.includes('figure') || desc.includes('minifig') || desc.includes('figure')) {
-    return 'Minifig';
+  if (d.startsWith('~') || d.startsWith('_moved') || d.includes('other compatible')) {
+    return 'Various Parts';
   }
 
-  // 2. Technic
-  if (cat.includes('technic') || desc.startsWith('technic')) {
-    return 'Technic';
+  // 1. Stickers
+  if (d.startsWith('sticker') || d.includes('sticker ') || d.startsWith('decal')) return 'Stickers';
+
+  // 2. Textiles
+  if (d.includes('cloth') || d.includes('fabric') || d.includes('sail') || d.includes('tent') || d.includes('cape')) return 'Textiles';
+
+  // 3. Animals
+  if (d.startsWith('animal') || d.includes('animal ') || d.includes('horse') || d.includes('dog') || d.includes('cat ') || d.includes('bird') || d.includes('shark') || d.includes('snake') || d.includes('spider') || d.includes('dragon') || d.includes('frog') || d.includes('dinosaur')) return 'Animals And Accessories For Animals';
+
+  // 4. Minifigures
+  if (d.startsWith('minifig') || d.includes('minifig') || d.startsWith('figure') || d.startsWith('skeleton')) {
+    if (d.includes('weapon') || d.includes('sword') || d.includes('gun') || d.includes('blaster') || d.includes('spear') || d.includes('bow ') || d.includes('axe') || d.includes('shield')) return 'Minifigures - Weapons';
+    if (d.includes('head ') || d.includes('head with') || d.endsWith('head')) return 'Minifigures - Heads';
+    if (d.includes('hair') || d.includes('beard')) return 'Minifigures - Hairs';
+    if (d.includes('helmet') || d.includes('hat') || d.includes('cap') || d.includes('hood') || d.includes('crown') || d.includes('mask')) return 'Minifigures - Head Clothing';
+    if (d.includes('torso') || d.includes('arm ') || d.includes('arms') || d.includes('hand ') || d.includes('hands')) return 'Minifigures - Upper Parts';
+    if (d.includes('leg') || d.includes('hips') || d.includes('tail') || d.includes('skirt')) return 'Minifigures - Lower Parts';
+    if (d.includes('wand') || d.includes('torch') || d.includes('glass') || d.includes('guitar') || d.includes('cup') || d.includes('mug')) return 'Minifigures - Accessories In Hand';
+    if (d.includes('accessory') || d.includes('backpack') || d.includes('air tank') || d.includes('cape') || d.includes('binoculars')) return 'Minifigures - Accessories';
+    return 'Minifigures';
   }
 
-  // 3. Slopes
-  if (cat.includes('slope') || cat.includes('wedge') || desc.startsWith('slope') || desc.includes('slope ')) {
-    return 'Slopes';
+  // 5. Electric
+  if (d.includes('electric') || d.includes('battery') || d.includes('motor') || d.includes('power functions') || d.includes('sensor')) return 'Electric Parts';
+
+  // 6. Food
+  if (d.includes('food') || d.includes('apple') || d.includes('banana') || d.includes('pizza') || d.includes('bread') || d.includes('cake') || d.includes('ice cream')) return 'Food Stuff';
+
+  // 7. Plants
+  if (d.startsWith('plant') || d.includes('plant ') || d.includes('flower') || d.includes('tree') || d.includes('leaf') || d.includes('leaves') || d.includes('bush') || d.includes('palm')) return 'Plants';
+
+  // 8. Fences & Ladders
+  if (d.includes('fence') || d.includes('ladder') || d.includes('barrier') || d.includes('railing')) return 'Fences And Ladders';
+
+  // 9. Doors & Windows
+  if (d.includes('door') || d.includes('window') || d.includes('shutter') || d.includes('gate') || d.startsWith('frame 1 x')) return 'Doors & Windows';
+
+  // 10. Windscreens
+  if (d.includes('windscreen') || d.includes('cockpit') || d.includes('canopy') || d.includes('windshield')) return 'Windscreens And Cockpits';
+
+  // 11. Rubbers & Strings
+  if (d.includes('rubber') || d.includes('string') || d.includes('belt') || d.includes('elastic') || d.includes('rope')) return 'Rubbers And Strings';
+
+  // 12. Signs & Flags
+  if (d.includes('sign') || d.includes('flag') || d.includes('pennant')) return 'Signs And Flags';
+
+  // 13. Slides & Rails
+  if (d.includes('slide') || d.includes('rail') || d.includes('track') || d.includes('roller coaster')) return 'Slides & Rails';
+
+  // 14. Transportation
+  if (d.includes('train') || d.includes('locomotive') || d.includes('bogie')) return 'Transportation - Trains';
+  if (d.includes('aircraft') || d.includes('airplane') || d.includes('helicopter') || d.includes('rotor') || d.includes('propeller')) return 'Transportation - Aviation';
+  if (d.includes('boat') || d.includes('ship') || d.includes('hull') || d.includes('mast') || d.includes('anchor')) return 'Transportation - Boats';
+  if (d.includes('wheelbase') || d.includes('wheel base') || d.includes('car base') || d.includes('chassis')) return 'Wheel Bases';
+  if (d.includes('wheel bearing') || d.includes('wheel pin') || d.includes('wheel holder') || d.includes('wheel based') || d.includes('steering wheel')) return 'Wheel Based';
+  if (d.includes('tyre') || d.includes('tire') || d.includes('rim ') || d.startsWith('wheel ')) {
+    if (d.includes('3.2') || d.includes('small') || d.includes('micro') || d.includes('mini')) return 'Tyres And Rims - Ø3.2';
+    if (d.includes('4.85') || d.includes('technic') || d.includes('standard')) return 'Tyres And Rims - Ø4.85';
+    return 'Tyres And Rims - Special';
+  }
+  if (d.includes('vehicle') || d.includes('car ') || d.includes('truck') || d.includes('mudguard') || d.includes('motorcycle')) return 'Transportation - Vehicles';
+
+  // 15. Tubes
+  if (d.startsWith('hose') || d.includes('hose ') || d.includes('tube') || d.includes('pipe')) return 'Tubes';
+
+  // 16. Cranes & Construction
+  if (d.includes('crane') || d.includes('scaffold') || d.includes('winch') || d.includes('pulley')) return 'Cranes And Scaffold';
+  if (d.includes('girder') || d.includes('truss') || d.includes('pylon') || d.includes('construction')) return 'Construction';
+
+  // 17. Gears & Functional
+  if (d.includes('gear') || d.includes('rack') || d.includes('differential') || d.includes('sprocket') || d.includes('transmission')) return 'Functionnal Elements - Gear Wheels And Racks';
+  if (d.includes('shock absorber') || d.includes('pneumatic') || d.includes('linear actuator') || d.includes('piston') || d.includes('spring')) return 'Functionnal Elements';
+
+  // 18. Connectors
+  if (d.includes('technic pin') || d.includes('technic axle') || d.includes('technic bush') || d.includes('axle connector') || d.includes('pin connector') || d.includes('connector')) return 'Connectors';
+
+  // 19. Beams
+  if (d.includes('technic beam') || d.includes('liftarm') || d.startsWith('beam ') || d.includes(' beam ')) {
+    if (d.includes('ball') || d.includes('cup') || d.includes('joint')) return 'Beams - Ball & Ball Cup';
+    if (d.includes('panel') || d.includes('fairing')) return 'Beams - Panels';
+    if (d.includes('thin') || d.includes('half') || d.includes('0.5')) {
+      if (d.includes('bent') || d.includes('angle') || d.includes('curved') || d.includes('special')) return 'Beams - Half - Special';
+      return 'Beams - Half';
+    }
+    if (d.includes('bent') || d.includes('angle') || d.includes('curved') || d.includes('special') || d.includes('triangle')) return 'Beams - Special';
+    return 'Beams';
   }
 
-  // 4. Tiles
-  if (cat.includes('tile') || desc.startsWith('tile')) {
-    return 'Tiles';
+  // 20. Decoration & Interior
+  if (d.includes('ornament') || d.includes('plume') || d.includes('feather') || d.includes('crystal') || d.includes('gem') || d.includes('star') || d.includes('antenna')) return 'Decoration Elements';
+  if (d.includes('chair') || d.includes('seat') || d.includes('table') || d.includes('cupboard') || d.includes('sink') || d.includes('desk') || d.includes('tap ') || d.includes('telephone')) return 'Interior';
+
+  // 21. Wall & Roof & Support
+  if (d.includes('roof') || d.includes('ridge') || d.includes('wall ') || d.includes('chimney')) return 'Wall & Roof Elements';
+  if (d.includes('support') || d.includes('pillar') || d.includes('column') || d.includes('post')) return 'Support';
+
+  // 22. Baseplates
+  if (d.startsWith('baseplate') || d.includes('baseplate')) return 'Plates - Baseplates';
+
+  // 23. Tiles
+  if (d.startsWith('tile') || d.includes('tile ')) {
+    if (d.includes('round') || d.includes('curved') || d.includes('modified') || d.includes('special') || d.includes('grille')) return 'Plates - Specials - Flat';
+    return 'Plates - Flat Tiles';
   }
 
-  // 5. Rounds
-  if (
-    cat.includes('cylinder') ||
-    cat.includes('cone') ||
-    cat.includes('dish') ||
-    cat.includes('round') ||
-    desc.includes('round') ||
-    desc.includes('cone') ||
-    desc.includes('cylinder')
-  ) {
-    return 'Rounds';
-  }
-
-  // 6. Baseplates
-  if (cat.includes('baseplate') || desc.startsWith('baseplate')) {
-    return 'Baseplates';
-  }
-
-  // 7. Panels
-  if (cat.includes('panel') || cat.includes('windscreen') || cat.includes('window') || cat.includes('door') || desc.includes('panel') || desc.includes('windscreen')) {
-    return 'Panels';
-  }
-
-  // 8. Plates
-  if (cat.includes('plate') || desc.startsWith('plate')) {
+  // 24. Plates
+  if (d.startsWith('plate') || d.includes('plate ')) {
+    if (d.includes('round') || d.includes('circle') || d.includes('curved') || d.includes('dish') || d.includes('turntable')) return 'Plates - Special - Circles';
+    if (d.includes('corner') || d.includes('angle') || d.includes('wedge plate') || d.includes('wing')) return 'Plates - Special - Angles';
+    if (d.includes('handle') || d.includes('clip') || d.includes('hinge') || d.includes('modified') || d.includes('special') || d.includes('pin')) return 'Plates - Special';
     return 'Plates';
   }
 
-  // 9. Bricks
-  if (cat.includes('brick') || cat.includes('arch') || desc.startsWith('brick')) {
+  // 25. Bricks
+  if (d.startsWith('brick') || d.includes('brick ') || d.startsWith('arch') || d.startsWith('slope') || d.startsWith('wedge') || d.startsWith('cone') || d.startsWith('cylinder')) {
+    if (d.includes('technic brick') || d.includes('brick with hole') || d.includes('brick with pin') || d.includes('ø4.85') || d.includes('4.85')) return 'Bricks - Special - Ø4.85';
+    if (d.includes('round') || d.includes('cylinder') || d.includes('circle') || d.includes('dome') || d.startsWith('cone')) return 'Bricks - Special - Circles';
+    if (d.includes('arch') || d.includes('bow') || d.includes('curved top')) {
+      if (d.includes('special') || d.includes('inverted')) return 'Bricks - Special - Bows';
+      return 'Bricks - Bows';
+    }
+    if (d.includes('slope') || d.includes('sloped') || d.startsWith('wedge')) {
+      if (d.includes('inverted') || d.includes('special') || d.includes('curved')) return 'Bricks - Special - Sloping';
+      return 'Bricks - Sloping';
+    }
+    if (d.includes('corner') || d.includes('angle')) return 'Bricks - Special - Angles';
+    if (d.includes('headlight') || d.includes('handle') || d.includes('clip') || d.includes('hinge') || d.includes('modified') || d.includes('special')) return 'Bricks - Special';
     return 'Bricks';
   }
 
-  // 10. Special
-  return 'Special';
+  return 'Various Parts';
 }
 
 /**
@@ -320,7 +400,12 @@ export async function extractAndIndexLibrary() {
         .toString('utf8')
         .trim();
       const desc = line1.replace(/^0\s+/, '').trim();
-      if (desc) {
+      if (
+        desc &&
+        !desc.startsWith('~') &&
+        !desc.startsWith('_Moved') &&
+        !desc.toLowerCase().includes('other compatible')
+      ) {
         partsListLines.push(`${filename}\t${desc}`);
         totalIndexedParts++;
       }

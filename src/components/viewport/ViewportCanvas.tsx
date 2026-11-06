@@ -12,14 +12,13 @@ import type {
 import { createAssemblyTable } from './ViewportGrid';
 import { ViewportGizmo } from './ViewportGizmo';
 import {
-  createBrickMesh,
   calculateLDrawStudSnap,
   snapToUnderlyingStuds,
   PLATE_HEIGHT,
   STUD_SPACING,
   BRICK_HEIGHT,
 } from '../../ldraw/proceduralBricks';
-import { loadLDrawPart, createDefaultFallbackBrick } from '../../ldraw/ldrawLoaderHelper';
+import { loadUnifiedBrick, createDefaultFallbackBrick } from '../../ldraw/ldrawLoaderHelper';
 import { getPartDefinitionOrFallback } from '../../ldraw/partsCatalogService';
 
 interface ViewportCanvasProps {
@@ -586,20 +585,16 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
         const partDef = getPartDefinitionOrFallback(brick.partId);
 
         let brickMesh: THREE.Group;
-
-        if (engineMode === 'ldraw') {
-          try {
-            brickMesh = await loadLDrawPart(brick.partId, brick.colorCode);
-          } catch (e) {
-            console.warn('Falha no LDrawLoader, usando fallback:', e);
-            brickMesh = createDefaultFallbackBrick(brick.partId, brick.colorCode, partDef);
-          }
-        } else {
-          brickMesh = createBrickMesh(
-            partDef,
+        try {
+          brickMesh = await loadUnifiedBrick(
+            brick.partId,
             brick.colorCode,
+            engineMode,
             settings.shadingMode === 'wireframe'
           );
+        } catch (e) {
+          console.warn('Falha no carregamento unificado da peça, usando fallback:', e);
+          brickMesh = createDefaultFallbackBrick(brick.partId, brick.colorCode, partDef, engineMode);
         }
 
         if (isCancelled) return;
@@ -720,40 +715,71 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
       }
     }
 
-    // Criar mesh fantasma semitransparente com a cor da peça
-    const ghost = createBrickMesh(activePlacement.partDef, activePlacement.colorCode);
-    ghost.name = 'placement_ghost_brick';
+    let isCancelled = false;
 
-    ghost.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh) {
-        const mesh = child as THREE.Mesh;
-        const mat = (mesh.material as THREE.MeshPhysicalMaterial).clone();
-        mat.transparent = true;
-        mat.opacity = 0.75;
-        mat.roughness = 0.35;
-        mat.metalness = 0.05;
-        mat.emissive = new THREE.Color(0xf59e0b);
-        mat.emissiveIntensity = 0.25;
-        mesh.material = mat;
-      }
-    });
+    const applyGhostStyle = (ghost: THREE.Group) => {
+      ghost.name = 'placement_ghost_brick';
+      ghost.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          const mesh = child as THREE.Mesh;
+          const curMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+          const mat = curMat ? (curMat.clone() as THREE.MeshPhysicalMaterial) : new THREE.MeshPhysicalMaterial();
+          mat.transparent = true;
+          mat.opacity = 0.75;
+          mat.roughness = 0.35;
+          mat.metalness = 0.05;
+          mat.emissive = new THREE.Color(0xf59e0b);
+          mat.emissiveIntensity = 0.25;
+          mesh.material = mat;
+        }
+      });
+    };
+
+    // Criar ghost preliminar instantâneo com dimensões compatíveis
+    const initialGhost = createDefaultFallbackBrick(
+      activePlacement.partDef.id,
+      activePlacement.colorCode,
+      activePlacement.partDef,
+      engineMode
+    );
+    applyGhostStyle(initialGhost);
 
     // Iniciar rotação igual à original (se houver)
     const initRotY = activePlacement.initialRotation ? activePlacement.initialRotation[1] : 0;
     ghostRotYRef.current = initRotY;
-    ghost.rotation.set(0, initRotY, 0);
+    initialGhost.rotation.set(0, initRotY, 0);
 
     // Posição inicial: se reposicionando, inicia na posição original da peça
     if (activePlacement.mode === 'reposition' && activePlacement.originalPosition) {
-      ghost.position.set(...activePlacement.originalPosition);
+      initialGhost.position.set(...activePlacement.originalPosition);
       ghostPositionRef.current = [...activePlacement.originalPosition];
-      ghost.visible = true;
+      initialGhost.visible = true;
     } else {
-      ghost.visible = false;
+      initialGhost.position.set(...ghostPositionRef.current);
+      initialGhost.visible = false;
     }
 
-    scene.add(ghost);
-    ghostMeshRef.current = ghost;
+    scene.add(initialGhost);
+    ghostMeshRef.current = initialGhost;
+
+    // Carregar geometria real unificada (mesma BufferGeometry LDraw para ambos os motores)
+    loadUnifiedBrick(activePlacement.partDef.id, activePlacement.colorCode, engineMode)
+      .then((realGhost) => {
+        if (isCancelled || !sceneRef.current) return;
+        applyGhostStyle(realGhost);
+        realGhost.rotation.set(0, ghostRotYRef.current, 0);
+        realGhost.position.set(...ghostPositionRef.current);
+        realGhost.visible = ghostMeshRef.current ? ghostMeshRef.current.visible : false;
+
+        if (ghostMeshRef.current) {
+          sceneRef.current.remove(ghostMeshRef.current);
+        }
+        sceneRef.current.add(realGhost);
+        ghostMeshRef.current = realGhost;
+      })
+      .catch((err) => {
+        console.warn('Aviso no ghost unificado:', err);
+      });
 
     // Atalhos durante o modo fantasma: R (girar 90°) e Esc (cancelar)
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -769,6 +795,7 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
+      isCancelled = true;
       window.removeEventListener('keydown', handleKeyDown);
       if (ghostMeshRef.current) {
         scene.remove(ghostMeshRef.current);
@@ -780,7 +807,7 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
         });
       }
     };
-  }, [activePlacement]);
+  }, [activePlacement, engineMode]);
 
   // Captura do clique inicial
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {

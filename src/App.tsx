@@ -55,7 +55,7 @@ export function App() {
 
   const [activeSidebarTab, setActiveSidebarTab] = useState<'parts' | 'colors' | 'inspector'>('parts');
   const [activeWorkspace, setActiveWorkspace] = useState<string>('Montagem');
-  const [engineMode, setEngineMode] = useState<'procedural' | 'ldraw'>('ldraw');
+  const [engineMode, setEngineMode] = useState<'procedural' | 'ldraw'>('procedural');
   const [currentProjectName, setCurrentProjectName] = useState<string>('blocchi_model.ldr');
   const [showCodeModal, setShowCodeModal] = useState<boolean>(false);
   const [exportedLDrawCode, setExportedLDrawCode] = useState<string>('');

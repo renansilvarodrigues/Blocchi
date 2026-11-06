@@ -4,17 +4,77 @@ export type ToolMode = 'select' | 'move' | 'rotate' | 'duplicate' | 'delete';
 
 export type SelectionSubMode = 'click' | 'box';
 
-export type LegoCategory =
-  | 'Bricks'
-  | 'Plates'
-  | 'Tiles'
-  | 'Slopes'
-  | 'Technic'
-  | 'Rounds'
-  | 'Panels'
-  | 'Minifig'
-  | 'Baseplates'
-  | 'Special';
+/**
+ * Taxonomia oficial rigorosa de categorias do ecossistema LDraw / Mecabricks
+ * (excluindo explicitamente "Other Compatible Products")
+ */
+export const OFFICIAL_LDRAW_CATEGORIES = [
+  'Animals And Accessories For Animals',
+  'Beams',
+  'Beams - Ball & Ball Cup',
+  'Beams - Half',
+  'Beams - Half - Special',
+  'Beams - Panels',
+  'Beams - Special',
+  'Bricks',
+  'Bricks - Bows',
+  'Bricks - Sloping',
+  'Bricks - Special',
+  'Bricks - Special - Angles',
+  'Bricks - Special - Bows',
+  'Bricks - Special - Circles',
+  'Bricks - Special - Ø4.85',
+  'Bricks - Special - Sloping',
+  'Connectors',
+  'Construction',
+  'Cranes And Scaffold',
+  'Decoration Elements',
+  'Doors & Windows',
+  'Electric Parts',
+  'Fences And Ladders',
+  'Food Stuff',
+  'Functionnal Elements',
+  'Functionnal Elements - Gear Wheels And Racks',
+  'Interior',
+  'Minifigures',
+  'Minifigures - Accessories',
+  'Minifigures - Accessories In Hand',
+  'Minifigures - Hairs',
+  'Minifigures - Head Clothing',
+  'Minifigures - Heads',
+  'Minifigures - Lower Parts',
+  'Minifigures - Upper Parts',
+  'Minifigures - Weapons',
+  'Plants',
+  'Plates',
+  'Plates - Baseplates',
+  'Plates - Flat Tiles',
+  'Plates - Special',
+  'Plates - Special - Angles',
+  'Plates - Special - Circles',
+  'Plates - Specials - Flat',
+  'Rubbers And Strings',
+  'Signs And Flags',
+  'Slides & Rails',
+  'Stickers',
+  'Support',
+  'Textiles',
+  'Transportation - Aviation',
+  'Transportation - Boats',
+  'Transportation - Trains',
+  'Transportation - Vehicles',
+  'Tubes',
+  'Tyres And Rims - Ø3.2',
+  'Tyres And Rims - Ø4.85',
+  'Tyres And Rims - Special',
+  'Various Parts',
+  'Wall & Roof Elements',
+  'Wheel Based',
+  'Wheel Bases',
+  'Windscreens And Cockpits',
+] as const;
+
+export type LegoCategory = (typeof OFFICIAL_LDRAW_CATEGORIES)[number];
 
 export interface LDrawColor {
   code: number;
