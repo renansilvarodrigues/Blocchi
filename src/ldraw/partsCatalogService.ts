@@ -2,9 +2,16 @@ import type { LegoPartDefinition, LegoCategory } from '../types/lego';
 export { OFFICIAL_LDRAW_CATEGORIES } from '../types/lego';
 import { LEGO_PARTS_CATALOG } from './partsData';
 
+interface MeasuredPartSize {
+  studsX: number;
+  studsZ: number;
+  heightPlates: number;
+}
+
 let cachedCatalog: LegoPartDefinition[] | null = null;
 let catalogPromise: Promise<LegoPartDefinition[]> | null = null;
 const partMap = new Map<string, LegoPartDefinition>();
+const measuredPartSizes = new Map<string, MeasuredPartSize>();
 
 // Inicializa o mapa com as peças curadas embutidas
 LEGO_PARTS_CATALOG.forEach((part) => partMap.set(part.id.toLowerCase(), part));
@@ -819,6 +826,57 @@ function estimateDimensions(
   return { studsX, studsZ, heightPlates };
 }
 
+function normalizeMeasuredPartSize(measured: MeasuredPartSize): MeasuredPartSize {
+  return {
+    studsX: Math.max(1, Math.round(measured.studsX)),
+    studsZ: Math.max(1, Math.round(measured.studsZ)),
+    heightPlates: Math.max(0.5, Math.round(measured.heightPlates * 100) / 100),
+  };
+}
+
+function applyMeasuredPartSize(
+  part: LegoPartDefinition,
+  measured: MeasuredPartSize
+): void {
+  const studsX = measured.studsX;
+  const studsZ = measured.studsZ;
+  const useMeasuredHeight =
+    measured.heightPlates >= 1 ||
+    part.category === 'Stickers' ||
+    part.category === 'Textiles';
+  const heightPlates = useMeasuredHeight
+    ? measured.heightPlates
+    : part.dimensions.heightPlates;
+
+  if (
+    studsX === part.dimensions.studsX &&
+    studsZ === part.dimensions.studsZ &&
+    heightPlates === part.dimensions.heightPlates
+  ) {
+    return;
+  }
+
+  part.dimensions = { studsX, studsZ, heightPlates };
+  part.lduSize = {
+    x: studsX * 20,
+    y: heightPlates * 8,
+    z: studsZ * 20,
+  };
+}
+
+export function syncPartDimensionsFromMeasurement(
+  partId: string,
+  measured: MeasuredPartSize
+): void {
+  const key = partId.toLowerCase();
+  const part = partMap.get(key);
+  if (!part || part.isFlexible) return;
+
+  const normalized = normalizeMeasuredPartSize(measured);
+  measuredPartSizes.set(key, normalized);
+  applyMeasuredPartSize(part, normalized);
+}
+
 /**
  * Determina se a peça é um modelo clássico e fundamental de construção
  * (ex: Brick 1x1, Brick 2x4, Plate 1x2, Tile 2x2, Slope 45 2x2, etc.)
@@ -934,9 +992,9 @@ export function parsePartsLst(content: string): LegoPartDefinition[] {
       continue;
     }
 
-    // Se já temos a peça na lista de peças curadas, preservá-la
-    const curated = partMap.get(id.toLowerCase());
-    if (curated) {
+    const key = id.toLowerCase();
+    const curated = partMap.get(key);
+    if (curated && !curated.isFallback) {
       result.push(curated);
       continue;
     }
@@ -962,6 +1020,8 @@ export function parsePartsLst(content: string): LegoPartDefinition[] {
       hasStuds:
         category !== 'Plates - Flat Tiles' &&
         category !== 'Plates - Specials - Flat' &&
+        category !== 'Stickers' &&
+        category !== 'Textiles' &&
         !cleanName.toLowerCase().includes('tile'),
       description: cleanName,
       isFlexible:
@@ -970,7 +1030,10 @@ export function parsePartsLst(content: string): LegoPartDefinition[] {
         cleanName.toLowerCase().includes('chain'),
     };
 
-    partMap.set(id.toLowerCase(), partDef);
+    const measured = measuredPartSizes.get(key);
+    if (measured) applyMeasuredPartSize(partDef, measured);
+
+    partMap.set(key, partDef);
     result.push(partDef);
   }
 
@@ -1021,10 +1084,13 @@ export async function getPartsCatalog(): Promise<LegoPartDefinition[]> {
           const map = new Map<string, LegoPartDefinition>();
           LEGO_PARTS_CATALOG.forEach((p) => map.set(p.id.toLowerCase(), p));
           jsonData.forEach((p) => {
-            if (!map.has(p.id.toLowerCase())) {
-              // Re-normalizar se necessário para a taxonomia estrita
+            const key = p.id.toLowerCase();
+            if (!map.has(key)) {
               const cat = categorizeLDrawPart(p.description || p.name, `${p.id}.dat`) || 'Various Parts';
-              map.set(p.id.toLowerCase(), { ...p, category: cat });
+              const parsedPart: LegoPartDefinition = { ...p, category: cat };
+              const measured = measuredPartSizes.get(key);
+              if (measured) applyMeasuredPartSize(parsedPart, measured);
+              map.set(key, parsedPart);
             }
           });
           const merged = Array.from(map.values()).sort(comparePartsByRelevance);
@@ -1062,7 +1128,7 @@ export function getPartDefinitionOrFallback(partId: string): LegoPartDefinition 
   const existing = partMap.get(partId.toLowerCase());
   if (existing) return existing;
 
-  // Cria definição dinâmica segura para peças que não estavam no índice
+  const key = partId.toLowerCase();
   const fallbackDef: LegoPartDefinition = {
     id: partId,
     name: `LDraw Part #${partId}`,
@@ -1070,9 +1136,13 @@ export function getPartDefinitionOrFallback(partId: string): LegoPartDefinition 
     dimensions: { studsX: 1, studsZ: 1, heightPlates: 3 },
     lduSize: { x: 20, y: 24, z: 20 },
     hasStuds: true,
+    isFallback: true,
     description: `Peça LDraw ${partId}`,
   };
 
-  partMap.set(partId.toLowerCase(), fallbackDef);
+  const measured = measuredPartSizes.get(key);
+  if (measured) applyMeasuredPartSize(fallbackDef, measured);
+
+  partMap.set(key, fallbackDef);
   return fallbackDef;
 }

@@ -13,6 +13,7 @@ import { createAssemblyTable } from './ViewportGrid';
 import { ViewportGizmo } from './ViewportGizmo';
 import {
   calculateLDrawStudSnap,
+  getEffectiveStudDimensions,
   snapToUnderlyingStuds,
   PLATE_HEIGHT,
   STUD_SPACING,
@@ -329,8 +330,9 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
         } else {
           // Movimentação em eixos horizontais ou planares
           if (partDef) {
-            const curHalfW = (partDef.dimensions.studsX * STUD_SPACING) / 2;
-            const curHalfL = (partDef.dimensions.studsZ * STUD_SPACING) / 2;
+            const currentDims = getEffectiveStudDimensions(partDef, obj.rotation.y);
+            const curHalfW = (currentDims.effX * STUD_SPACING) / 2;
+            const curHalfL = (currentDims.effZ * STUD_SPACING) / 2;
 
             let bestUnderlying: {
               brick: PlacedBrick;
@@ -347,8 +349,9 @@ export const ViewportCanvas: React.FC<ViewportCanvasProps> = ({
               const otherDef = getPartDefinitionOrFallback(other.partId);
               if (!otherDef) continue;
 
-              const otherHalfW = (otherDef.dimensions.studsX * STUD_SPACING) / 2;
-              const otherHalfL = (otherDef.dimensions.studsZ * STUD_SPACING) / 2;
+              const otherDims = getEffectiveStudDimensions(otherDef, other.rotation[1]);
+              const otherHalfW = (otherDims.effX * STUD_SPACING) / 2;
+              const otherHalfL = (otherDims.effZ * STUD_SPACING) / 2;
               const otherHeight = otherDef.dimensions.heightPlates * PLATE_HEIGHT;
               const topSurface = other.position[1] + otherHeight;
 

@@ -21,6 +21,7 @@ import {
   STUD_SPACING,
   PLATE_HEIGHT,
   calculateLDrawStudSnap,
+  getEffectiveStudDimensions,
   snapToUnderlyingStuds,
 } from './ldraw/proceduralBricks';
 import { X, Copy, Download, Code } from 'lucide-react';
@@ -322,8 +323,9 @@ export function App() {
         const currentDef = getPartDefinitionOrFallback(current.partId);
         if (!currentDef) continue;
 
-        const curHalfW = (currentDef.dimensions.studsX * STUD_SPACING) / 2;
-        const curHalfL = (currentDef.dimensions.studsZ * STUD_SPACING) / 2;
+        const currentDims = getEffectiveStudDimensions(currentDef, current.rotation[1]);
+        const curHalfW = (currentDims.effX * STUD_SPACING) / 2;
+        const curHalfL = (currentDims.effZ * STUD_SPACING) / 2;
 
         let bestUnderlying: { brick: PlacedBrick; def: LegoPartDefinition; topY: number } | null =
           null;
@@ -332,8 +334,9 @@ export function App() {
           if (other.instanceId === current.instanceId) continue;
           const otherDef = getPartDefinitionOrFallback(other.partId);
           if (!otherDef) continue;
-          const otherHalfW = (otherDef.dimensions.studsX * STUD_SPACING) / 2;
-          const otherHalfL = (otherDef.dimensions.studsZ * STUD_SPACING) / 2;
+          const otherDims = getEffectiveStudDimensions(otherDef, other.rotation[1]);
+          const otherHalfW = (otherDims.effX * STUD_SPACING) / 2;
+          const otherHalfL = (otherDims.effZ * STUD_SPACING) / 2;
           const otherHeight = otherDef.dimensions.heightPlates * PLATE_HEIGHT;
           const topSurface = other.position[1] + otherHeight;
 

@@ -10,7 +10,10 @@ import {
   STUD_SPACING,
   createBrickMesh,
 } from './proceduralBricks';
-import { getPartDefinitionOrFallback } from './partsCatalogService';
+import {
+  getPartDefinitionOrFallback,
+  syncPartDimensionsFromMeasurement,
+} from './partsCatalogService';
 import {
   applyTexmapUVs,
   attachLDrawFileMap,
@@ -678,6 +681,7 @@ function finalizeLoadedGroup(
   }
 
   const measured = measureGroup(group, hasStuds);
+  syncPartDimensionsFromMeasurement(partId, measured);
 
   wrapper.add(group);
   wrapper.userData = {

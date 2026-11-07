@@ -109,6 +109,7 @@ export interface LegoPartDefinition {
   };
   hasStuds: boolean;
   isFlexible?: boolean;
+  isFallback?: boolean;
   slopeAngle?: number;
   isInvertedSlope?: boolean;
   connectionPoints?: ConnectionPoint[];
