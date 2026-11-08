@@ -18,6 +18,7 @@ import {
   applyTexmapUVs,
   attachLDrawFileMap,
   configureLDrawLoader,
+  getLDrawAssetUrl,
   getTexmapRecordByCode,
   installPreloadedFiles,
   preloadLDrawPart,
@@ -722,14 +723,16 @@ async function fetchRawLDrawGeometry(cleanId: string): Promise<THREE.Group> {
   } catch (error) {
     throw new Error(
       `[LDraw] O parser falhou ao montar a árvore da peça "${cleanId}" ` +
-        `(arquivo raiz: "${preload.rootPath}", ${preload.files.size} arquivos carregados).`,
+        `(arquivo raiz: "${preload.rootPath}", URL: "${getLDrawAssetUrl(preload.rootPath)}", ` +
+        `${preload.files.size} arquivos carregados).`,
       { cause: error }
     );
   }
 
   if (!group || group.children.length === 0) {
     throw new Error(
-      `[LDraw] A peça "${cleanId}" foi encontrada em "${preload.rootPath}", ` +
+      `[LDraw] A peça "${cleanId}" foi encontrada em "${preload.rootPath}" ` +
+        `(URL: "${getLDrawAssetUrl(preload.rootPath)}"), ` +
         'mas não produziu geometria renderizável.'
     );
   }

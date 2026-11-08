@@ -197,8 +197,23 @@ export function configureLDrawLoader(
   const loaderAny = loader as any;
   if (loaderAny.__ldrawCaseInsensitiveFetch) return;
 
-  const originalFetchData = loaderAny.fetchData.bind(loader) as (fileName: string) => Promise<string>;
-  loaderAny.fetchData = async (fileName: string) => {
+  // O método fetchData pertence ao LDrawParsedCache interno (partsCache.parseCache),
+  // não ao LDrawLoader. Sem este wrapper, o loader tenta caminhos com case misto
+  // e falha em servidores case-sensitive como o GitHub Pages.
+  const parseCache = loaderAny.partsCache?.parseCache;
+  if (!parseCache || typeof parseCache.fetchData !== 'function') {
+    console.warn(
+      '[LDraw] partsCache.parseCache.fetchData não encontrado; ' +
+        'o carregamento seguirá pelo filemap e pelo cache de arquivos pré-carregados.'
+    );
+    loaderAny.__ldrawCaseInsensitiveFetch = true;
+    return;
+  }
+
+  const originalFetchData = parseCache.fetchData.bind(parseCache) as (
+    fileName: string
+  ) => Promise<string>;
+  parseCache.fetchData = async (fileName: string) => {
     const originalName = fileName.replace(/\\/g, '/');
     const normalizedName = normalizePath(originalName);
 
