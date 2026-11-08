@@ -364,22 +364,24 @@ function buildFileMap(entries) {
     const lowerRel = relPath.toLowerCase();
     const base = path.basename(lowerRel);
 
-    map[lowerRel] = relPath;
+    // Todos os caminhos publicados e mapeados são lowercase para funcionar
+    // em servidores case-sensitive (GitHub Pages/Linux).
+    map[lowerRel] = lowerRel;
 
     const priority = basePriority(lowerRel);
     if (!(base in map) || priority > (priorities.get(base) ?? -1)) {
-      map[base] = relPath;
+      map[base] = lowerRel;
       priorities.set(base, priority);
     }
 
     if (lowerRel.startsWith('p/48/')) {
-      map[`48/${base}`] = relPath;
+      map[`48/${base}`] = lowerRel;
     } else if (lowerRel.startsWith('p/8/')) {
-      map[`8/${base}`] = relPath;
+      map[`8/${base}`] = lowerRel;
     } else if (lowerRel.startsWith('parts/s/')) {
-      map[`s/${base}`] = relPath;
+      map[`s/${base}`] = lowerRel;
     } else if (lowerRel.startsWith('parts/textures/')) {
-      map[`textures/${base}`] = relPath;
+      map[`textures/${base}`] = lowerRel;
     }
   }
 
@@ -402,24 +404,23 @@ export async function extractAndIndexLibrary() {
   const entries = zip.getEntries();
   const entryMap = new Map();
   for (const entry of entries) {
-    entryMap.set(entry.entryName.toLowerCase(), entry);
+    entryMap.set(entry.entryName.replace(/\\/g, '/').toLowerCase(), entry);
   }
 
-  // 1. Extrair LDConfig.ldr
+  // 1. Extrair LDConfig.ldr (sempre em lowercase)
   const ldconfigEntry = entryMap.get('ldraw/ldconfig.ldr');
   if (ldconfigEntry) {
-    fs.writeFileSync(path.join(publicLDrawDir, 'LDConfig.ldr'), ldconfigEntry.getData());
-    // Copiar também para public/LDConfig.ldr para compatibilidade legada
-    fs.writeFileSync(path.join(rootDir, 'public', 'LDConfig.ldr'), ldconfigEntry.getData());
-    console.log('[LDraw Sync] LDConfig.ldr extraído.');
+    fs.writeFileSync(path.join(publicLDrawDir, 'ldconfig.ldr'), ldconfigEntry.getData());
+    console.log('[LDraw Sync] ldconfig.ldr extraído.');
   }
 
   // 2. Extrair todas as primitivas (/p)
   console.log('[LDraw Sync] Extraindo primitivas LDraw (/p)...');
   let primitivesCount = 0;
   for (const entry of entries) {
-    if (entry.entryName.startsWith('ldraw/p/')) {
-      const relPath = entry.entryName.replace(/^ldraw\//, '');
+    const lowerEntryName = entry.entryName.toLowerCase().replace(/\\/g, '/');
+    if (lowerEntryName.startsWith('ldraw/p/')) {
+      const relPath = lowerEntryName.replace(/^ldraw\//, '');
       const dest = path.join(publicLDrawDir, relPath);
       if (entry.isDirectory) {
         fs.mkdirSync(dest, { recursive: true });
@@ -455,7 +456,7 @@ export async function extractAndIndexLibrary() {
       continue;
     }
 
-    const relPath = entry.entryName.replace(/\\/g, '/').substring('ldraw/'.length);
+    const relPath = entry.entryName.replace(/\\/g, '/').substring('ldraw/'.length).toLowerCase();
     const dest = path.join(publicLDrawDir, relPath);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.writeFileSync(dest, entry.getData());
@@ -477,7 +478,7 @@ export async function extractAndIndexLibrary() {
       !normName.startsWith('ldraw/parts/s/') &&
       !entry.isDirectory
     ) {
-      const filename = entry.entryName.substring('ldraw/parts/'.length);
+      const filename = entry.entryName.substring('ldraw/parts/'.length).toLowerCase();
       const data = entry.getData();
       const firstNewline = data.indexOf(10);
       const line1 = (firstNewline !== -1 ? data.subarray(0, firstNewline) : data)
@@ -549,7 +550,7 @@ export async function extractAndIndexLibrary() {
       return;
     }
 
-    const dest = path.join(publicLDrawDir, canonical);
+    const dest = path.join(publicLDrawDir, norm);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     const data = zipEntry.getData();
     fs.writeFileSync(dest, data);

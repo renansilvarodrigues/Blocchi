@@ -17,6 +17,7 @@ import {
 import {
   applyTexmapUVs,
   attachLDrawFileMap,
+  configureLDrawLoader,
   getTexmapRecordByCode,
   installPreloadedFiles,
   preloadLDrawPart,
@@ -88,9 +89,9 @@ export function getInitializedLDrawLoader(): LDrawLoader {
   loader.setConditionalLineMaterial(LDrawConditionalLineMaterial);
   loader.addDefaultMaterials();
 
-  const baseUrl = import.meta.env.BASE_URL || '/';
-  const ldrawPath = baseUrl.endsWith('/') ? `${baseUrl}ldraw/` : `${baseUrl}/ldraw/`;
-  loader.setPartsLibraryPath(ldrawPath);
+  // Usa ${import.meta.env.BASE_URL}ldraw/ (localhost e subpasta do GitHub Pages)
+  // e força todos os fetches internos do loader para lowercase.
+  configureLDrawLoader(loader);
 
   // 1. Pré-popular biblioteca com todas as cores oficiais LDraw.
   for (const color of LDRAW_COLORS) {

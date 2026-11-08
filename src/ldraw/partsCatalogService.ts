@@ -12,6 +12,54 @@ let cachedCatalog: LegoPartDefinition[] | null = null;
 let catalogPromise: Promise<LegoPartDefinition[]> | null = null;
 const partMap = new Map<string, LegoPartDefinition>();
 const measuredPartSizes = new Map<string, MeasuredPartSize>();
+let availablePartsPromise: Promise<Set<string> | null> | null = null;
+
+function normalizePartId(partId: string): string {
+  return partId.trim().toLowerCase().replace(/\.dat$/i, '');
+}
+
+/**
+ * Em produção, o catálogo completo (parts.lst) lista todas as peças oficiais
+ * LDraw, mas public/ldraw/parts contém apenas as peças realmente extraídas.
+ * O manifesto available-parts.json evita oferecer peças que dariam 404.
+ */
+async function loadAvailablePartIds(ldrawBase: string): Promise<Set<string> | null> {
+  if (!import.meta.env.PROD) return null;
+  if (availablePartsPromise) return availablePartsPromise;
+
+  const url = `${ldrawBase}available-parts.json`;
+  availablePartsPromise = fetch(url)
+    .then(async (response) => {
+      if (!response.ok) {
+        console.warn(
+          `[LDraw Catalog] Manifesto de peças não encontrado em "${url}" ` +
+            `(HTTP ${response.status}). O catálogo completo será mantido.`
+        );
+        return null;
+      }
+
+      const raw = await response.json();
+      if (!Array.isArray(raw) || raw.length === 0) return null;
+
+      return new Set(
+        raw.map((id) => normalizePartId(String(id))).filter((id) => id.length > 0)
+      );
+    })
+    .catch((error) => {
+      console.warn(`[LDraw Catalog] Falha ao carregar "${url}".`, error);
+      return null;
+    });
+
+  return availablePartsPromise;
+}
+
+function filterByAvailableParts(
+  parts: LegoPartDefinition[],
+  available: Set<string> | null
+): LegoPartDefinition[] {
+  if (!available) return parts;
+  return parts.filter((part) => available.has(normalizePartId(part.id)));
+}
 
 // Inicializa o mapa com as peças curadas embutidas
 LEGO_PARTS_CATALOG.forEach((part) => partMap.set(part.id.toLowerCase(), part));
@@ -1054,6 +1102,7 @@ export async function getPartsCatalog(): Promise<LegoPartDefinition[]> {
   catalogPromise = (async () => {
     const baseUrl = import.meta.env.BASE_URL || '/';
     const ldrawBase = baseUrl.endsWith('/') ? `${baseUrl}ldraw/` : `${baseUrl}/ldraw/`;
+    const availableParts = await loadAvailablePartIds(ldrawBase);
 
     // 1. Tentar ler o índice oficial parts.lst
     try {
@@ -1063,10 +1112,19 @@ export async function getPartsCatalog(): Promise<LegoPartDefinition[]> {
         const text = await response.text();
         if (text && text.length > 50) {
           const parsed = parsePartsLst(text);
-          if (parsed.length > 0) {
-            console.log(`[LDraw Catalog] Carregadas com sucesso ${parsed.length} peças oficiais via parts.lst.`);
-            cachedCatalog = parsed;
-            return parsed;
+          const catalogParts = filterByAvailableParts(parsed, availableParts);
+          if (catalogParts.length > 0) {
+            if (availableParts && catalogParts.length < parsed.length) {
+              console.warn(
+                `[LDraw Catalog] ${parsed.length - catalogParts.length} peça(s) do parts.lst ` +
+                  'não estão publicadas em public/ldraw/parts e foram ocultadas para evitar 404.'
+              );
+            }
+            console.log(
+              `[LDraw Catalog] Carregadas com sucesso ${catalogParts.length} peças oficiais via parts.lst.`
+            );
+            cachedCatalog = catalogParts;
+            return catalogParts;
           }
         }
       }
@@ -1079,8 +1137,11 @@ export async function getPartsCatalog(): Promise<LegoPartDefinition[]> {
       const jsonUrl = `${ldrawBase}parts-catalog.json`;
       const jsonRes = await fetch(jsonUrl);
       if (jsonRes.ok) {
-        const jsonData = (await jsonRes.json()) as LegoPartDefinition[];
-        if (Array.isArray(jsonData) && jsonData.length > 0) {
+        const rawJsonData = (await jsonRes.json()) as LegoPartDefinition[];
+        const jsonData = Array.isArray(rawJsonData)
+          ? filterByAvailableParts(rawJsonData, availableParts)
+          : [];
+        if (jsonData.length > 0) {
           const map = new Map<string, LegoPartDefinition>();
           LEGO_PARTS_CATALOG.forEach((p) => map.set(p.id.toLowerCase(), p));
           jsonData.forEach((p) => {

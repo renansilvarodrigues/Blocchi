@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "predev": "node scripts/normalize-ldraw-case.mjs",
     "sync-ldraw": "node scripts/sync-ldraw.mjs",
-    "build": "node scripts/download-ldraw.mjs && node scripts/sync-ldraw.mjs && tsc -b && vite build",
+    "normalize-ldraw": "node scripts/normalize-ldraw-case.mjs",
+    "build": "node scripts/download-ldraw.mjs && node scripts/sync-ldraw.mjs && node scripts/normalize-ldraw-case.mjs && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },

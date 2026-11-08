@@ -42,13 +42,20 @@ export const LDRAW_BASE_PATH = BASE_URL.endsWith('/')
   ? `${BASE_URL}ldraw/`
   : `${BASE_URL}/ldraw/`;
 
-const normalizePath = (value: string): string =>
-  value
+/**
+ * O GitHub Pages é case-sensitive. Toda requisição LDraw passa por aqui antes
+ * de virar URL, garantindo que o caminho solicitado seja sempre lowercase.
+ */
+export function normalizeLDrawPath(value: string): string {
+  return value
     .replace(/\\/g, '/')
     .replace(/^\.?\//, '')
     .replace(/^ldraw\//i, '')
     .trim()
     .toLowerCase();
+}
+
+const normalizePath = normalizeLDrawPath;
 
 let fileMapPromise: Promise<Record<string, string>> | null = null;
 let normalizedFileMap: Record<string, string> = Object.create(null);
@@ -174,6 +181,45 @@ export async function attachLDrawFileMap(loader: LDrawLoader): Promise<void> {
 }
 
 /**
+ * Configura o LDrawLoader para usar o BASE_URL do Vite (localhost e subpasta
+ * do GitHub Pages) e normaliza qualquer fetch interno para lowercase.
+ */
+export function configureLDrawLoader(
+  loader: LDrawLoader,
+  libraryPath: string = LDRAW_BASE_PATH
+): void {
+  const normalizedLibraryPath = libraryPath.endsWith('/') ? libraryPath : `${libraryPath}/`;
+
+  loader.setPath(normalizedLibraryPath);
+  loader.setPartsLibraryPath(normalizedLibraryPath);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const loaderAny = loader as any;
+  if (loaderAny.__ldrawCaseInsensitiveFetch) return;
+
+  const originalFetchData = loaderAny.fetchData.bind(loader) as (fileName: string) => Promise<string>;
+  loaderAny.fetchData = async (fileName: string) => {
+    const originalName = fileName.replace(/\\/g, '/');
+    const normalizedName = normalizePath(originalName);
+
+    try {
+      return await originalFetchData(normalizedName);
+    } catch (error) {
+      // Bibliotecas antigas podem ter sido publicadas com case misto. Nesse
+      // caso, o caminho original ainda é tentado como último recurso.
+      if (normalizedName !== originalName) {
+        console.warn(
+          `[LDraw] Busca em lowercase falhou para "${originalName}"; tentando o caminho original.`
+        );
+        return originalFetchData(originalName);
+      }
+      throw error;
+    }
+  };
+  loaderAny.__ldrawCaseInsensitiveFetch = true;
+}
+
+/**
  * Resolve um nome de arquivo LDraw para o caminho canônico relativo à raiz /ldraw/.
  *
  * Ordem de resolução:
@@ -186,7 +232,7 @@ export function resolveLDrawPath(name: string, fromPath?: string): string | null
   if (!normalized) return null;
 
   const direct = normalizedFileMap[normalized];
-  if (direct) return direct;
+  if (direct) return normalizePath(direct);
 
   // Referências relativas ao diretório do arquivo que as contém.
   if (fromPath) {
@@ -195,7 +241,7 @@ export function resolveLDrawPath(name: string, fromPath?: string): string | null
     if (slash > 0) {
       const relative = normalizePath(`${normalizedFrom.slice(0, slash)}/${normalized}`);
       const resolved = normalizedFileMap[relative];
-      if (resolved) return resolved;
+      if (resolved) return normalizePath(resolved);
     }
   }
 
@@ -203,14 +249,15 @@ export function resolveLDrawPath(name: string, fromPath?: string): string | null
   const base = normalized.split('/').pop();
   if (base && base !== normalized) {
     const resolved = normalizedFileMap[base];
-    if (resolved) return resolved;
+    if (resolved) return normalizePath(resolved);
   }
 
-  return normalizedFileMap[base || normalized] ?? null;
+  const fallback = normalizedFileMap[base || normalized];
+  return fallback ? normalizePath(fallback) : null;
 }
 
 export function getLDrawAssetUrl(canonicalPath: string): string {
-  return `${LDRAW_BASE_PATH}${canonicalPath.replace(/^\/+/, '')}`;
+  return `${LDRAW_BASE_PATH}${normalizePath(canonicalPath)}`;
 }
 
 function splitLines(text: string): string[] {
@@ -408,38 +455,77 @@ async function processTexmapDirectives(
   return { text: result.join('\n'), texmaps };
 }
 
+function buildAssetCandidates(canonicalPath: string): string[] {
+  const normalized = normalizePath(canonicalPath);
+  const base = normalized.split('/').pop() ?? normalized;
+  const candidates = [normalized];
+
+  // Fallback para bibliotecas publicadas antes da normalização de case, ou
+  // quando a referência veio sem o diretório oficial (ex.: "s/..." ou "48/...").
+  for (const prefix of [
+    'parts/',
+    'parts/s/',
+    'parts/textures/',
+    'p/',
+    'p/48/',
+    'p/8/',
+    'textures/',
+    'models/',
+  ]) {
+    const candidate = `${prefix}${base}`;
+    if (!candidates.includes(candidate)) candidates.push(candidate);
+  }
+
+  return candidates;
+}
+
 async function fetchLDrawText(canonicalPath: string): Promise<string> {
-  const cached = rawFileCache.get(canonicalPath);
+  const normalizedPath = normalizePath(canonicalPath);
+  const cached = rawFileCache.get(normalizedPath);
   if (cached !== undefined) return cached;
 
-  const url = getLDrawAssetUrl(canonicalPath);
-  let response: Response;
+  const attempts: Array<{ url: string; status: string }> = [];
 
-  try {
-    response = await fetch(url);
-  } catch (error) {
-    throw new Error(`[LDraw] Falha de rede ao buscar "${canonicalPath}" em "${url}".`, {
-      cause: error,
-    });
+  for (const candidate of buildAssetCandidates(normalizedPath)) {
+    const url = getLDrawAssetUrl(candidate);
+
+    let response: Response;
+    try {
+      response = await fetch(url);
+    } catch (error) {
+      attempts.push({ url, status: 'falha de rede' });
+      console.error(
+        `[LDraw] Falha de rede ao buscar "${candidate}". URL exata: ${url}`,
+        error
+      );
+      continue;
+    }
+
+    if (!response.ok) {
+      attempts.push({ url, status: `HTTP ${response.status} ${response.statusText}` });
+      if (response.status === 404) {
+        console.error(`[LDraw] 404 (Not Found): ${url}`);
+      }
+      continue;
+    }
+
+    const text = await response.text();
+    const head = text.slice(0, 200).trim().toLowerCase();
+    if (head.startsWith('<!doctype html') || head.startsWith('<html')) {
+      attempts.push({ url, status: 'HTML de fallback (arquivo ausente)' });
+      console.error(`[LDraw] O servidor devolveu HTML em vez do arquivo LDraw: ${url}`);
+      continue;
+    }
+
+    rawFileCache.set(normalizedPath, text);
+    return text;
   }
 
-  if (!response.ok) {
-    throw new Error(
-      `[LDraw] Recurso oficial não encontrado: "${canonicalPath}" (HTTP ${response.status} ${response.statusText}) em "${url}".`
-    );
-  }
-
-  const text = await response.text();
-  const head = text.slice(0, 200).trim().toLowerCase();
-  if (head.startsWith('<!doctype html') || head.startsWith('<html')) {
-    throw new Error(
-      `[LDraw] O servidor devolveu HTML em vez de um arquivo LDraw para "${canonicalPath}" (${url}). ` +
-        'Isso normalmente indica fallback de SPA/404 — o arquivo não existe na biblioteca publicada.'
-    );
-  }
-
-  rawFileCache.set(canonicalPath, text);
-  return text;
+  const attemptedUrls = attempts.map((attempt) => `  - ${attempt.url} (${attempt.status})`).join('\n');
+  throw new Error(
+    `[LDraw] Recurso oficial não encontrado: "${normalizedPath}".\n` +
+      `URLs tentadas (base "${LDRAW_BASE_PATH}"):\n${attemptedUrls}`
+  );
 }
 
 async function getProcessedFile(canonicalPath: string): Promise<ProcessedFile> {

@@ -3,10 +3,14 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { ldrawVitePlugin } from './vite-plugin-ldraw.ts'
 
+// GitHub Pages project sites are served from /<repo-name>/. The repository
+// name is provided automatically by the Actions environment, so renames and
+// forks keep working. VITE_BASE_PATH can override it for custom domains.
+const repositoryName = process.env.GITHUB_REPOSITORY?.split('/')[1]
+const base = process.env.VITE_BASE_PATH || (repositoryName ? `/${repositoryName}/` : './')
+
 export default defineConfig({
-  // GitHub Pages project sites are served from /<repo-name>/, so use the repo path in production.
-  // In local development we keep a relative root so the app still works when run with `vite`.
-  base: process.env.NODE_ENV === 'production' ? '/Blocchi/' : './',
+  base,
   plugins: [
     react(),
     tailwindcss(),

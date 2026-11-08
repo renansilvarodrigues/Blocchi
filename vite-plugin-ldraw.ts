@@ -46,7 +46,13 @@ export function ldrawVitePlugin(): Plugin {
     const fileMapPath = path.resolve('public/ldraw/filemap.json');
     if (fs.existsSync(fileMapPath)) {
       try {
-        fileMapCache = JSON.parse(fs.readFileSync(fileMapPath, 'utf8'));
+        const parsed = JSON.parse(fs.readFileSync(fileMapPath, 'utf8')) as Record<string, unknown>;
+        const normalized: Record<string, string> = Object.create(null);
+        for (const [key, value] of Object.entries(parsed)) {
+          if (typeof value !== 'string') continue;
+          normalized[key.replace(/\\/g, '/').toLowerCase()] = value.replace(/\\/g, '/').toLowerCase();
+        }
+        fileMapCache = normalized;
         return fileMapCache;
       } catch {}
     }
@@ -67,24 +73,24 @@ export function ldrawVitePlugin(): Plugin {
       const base = path.basename(lowerRel);
 
       // Mapeamento direto do caminho relativo oficial (ex: parts/3001.dat, p/48/1-4cyli.dat)
-      map[lowerRel] = relPath;
+      map[lowerRel] = lowerRel;
 
       // Mapeamento por nome base, respeitando a prioridade de qualidade.
       const priority = basePriority(lowerRel);
       if (!(base in map) || priority > (priorities.get(base) ?? -1)) {
-        map[base] = relPath;
+        map[base] = lowerRel;
         priorities.set(base, priority);
       }
 
       // Aliases de subdiretórios usados nas referências LDraw.
       if (lowerRel.startsWith('p/48/')) {
-        map[`48/${base}`] = relPath;
+        map[`48/${base}`] = lowerRel;
       } else if (lowerRel.startsWith('p/8/')) {
-        map[`8/${base}`] = relPath;
+        map[`8/${base}`] = lowerRel;
       } else if (lowerRel.startsWith('parts/s/')) {
-        map[`s/${base}`] = relPath;
+        map[`s/${base}`] = lowerRel;
       } else if (lowerRel.startsWith('parts/textures/')) {
-        map[`textures/${base}`] = relPath;
+        map[`textures/${base}`] = lowerRel;
       }
     }
 
@@ -118,7 +124,7 @@ export function ldrawVitePlugin(): Plugin {
         !name.startsWith('ldraw/parts/s/') &&
         !entry.isDirectory
       ) {
-        const filename = entry.entryName.replace(/\\/g, '/').substring('ldraw/parts/'.length);
+        const filename = entry.entryName.replace(/\\/g, '/').substring('ldraw/parts/'.length).toLowerCase();
         const data = entry.getData();
         const firstNewline = data.indexOf(10);
         const line1 = (firstNewline !== -1 ? data.subarray(0, firstNewline) : data)
@@ -216,11 +222,14 @@ export function ldrawVitePlugin(): Plugin {
           }
         }
 
-        // 4. Interceptar LDConfig.ldr
-        if (url.endsWith('/ldraw/LDConfig.ldr') || url.endsWith('/LDConfig.ldr')) {
-          const localPath = path.resolve('public/ldraw/LDConfig.ldr');
+        // 4. Interceptar LDConfig.ldr (sempre em lowercase no disco)
+        if (/\/ldraw\/ldconfig\.ldr$/i.test(url) || /\/ldconfig\.ldr$/i.test(url)) {
+          const localPath = path.resolve('public/ldraw/ldconfig.ldr');
           if (fs.existsSync(localPath)) {
-            return next();
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            res.end(fs.readFileSync(localPath));
+            return;
           }
 
           const zipData = getZip();
@@ -247,11 +256,12 @@ export function ldrawVitePlugin(): Plugin {
               : url.slice('/ldraw/'.length)
           ).trim();
 
-          // Limpar prefixos duplicados acidentais
+          // Limpar prefixos duplicados acidentais e normalizar para lowercase.
           reqPath = reqPath.replace(/^parts\/parts\//i, 'parts/');
           reqPath = reqPath.replace(/^p\/p\//i, 'p/');
+          reqPath = reqPath.toLowerCase();
 
-          const lowerReqPath = reqPath.toLowerCase();
+          const lowerReqPath = reqPath;
           const baseName = path.basename(lowerReqPath);
           const isPng = lowerReqPath.endsWith('.png');
 
@@ -360,6 +370,7 @@ export function ldrawVitePlugin(): Plugin {
 
           // Recurso LDraw explicitamente ausente: nunca cair no fallback HTML do SPA,
           // que faria o parser interpretar uma página inteira como geometria.
+          console.warn(`[Vite LDraw Plugin] 404: recurso LDraw não encontrado em "${req.url ?? url}" (${reqPath}).`);
           res.statusCode = 404;
           res.setHeader('Content-Type', 'text/plain; charset=utf-8');
           res.end(`LDraw asset not found: ${reqPath}`);
