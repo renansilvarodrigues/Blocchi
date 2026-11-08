@@ -10,8 +10,7 @@ import { fileURLToPath } from 'node:url';
  *
  * - renomeia recursivamente todas as pastas e arquivos para lowercase;
  * - reescreve referências de subarquivos/TEXMAP dentro de .dat/.ldr/.mpd;
- * - normaliza o filemap.json e o parts.lst;
- * - gera available-parts.json com as peças realmente publicadas.
+ * - normaliza o filemap.json e o parts.lst.
  *
  * É idempotente: pode rodar quantas vezes for necessário.
  */
@@ -26,7 +25,6 @@ const stats = {
   conflicts: 0,
   rewritten: 0,
   fileMapEntries: 0,
-  availableParts: 0,
 };
 
 let tempCounter = 0;
@@ -195,26 +193,6 @@ function normalizePartsLst() {
   }
 }
 
-function generateAvailablePartsManifest() {
-  const partsDir = path.join(ldrawDir, 'parts');
-  if (!fs.existsSync(partsDir)) return;
-
-  const availableParts = listEntries(partsDir)
-    .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.dat'))
-    .map((entry) => entry.name.slice(0, -4).toLowerCase())
-    .sort((a, b) => a.localeCompare(b));
-
-  stats.availableParts = availableParts.length;
-
-  if (!checkOnly) {
-    fs.writeFileSync(
-      path.join(ldrawDir, 'available-parts.json'),
-      JSON.stringify(availableParts, null, 2),
-      'utf8'
-    );
-  }
-}
-
 function main() {
   if (!fs.existsSync(ldrawDir)) {
     console.warn(`[LDraw Normalize] Pasta não encontrada: ${ldrawDir}. Nada a fazer.`);
@@ -227,7 +205,6 @@ function main() {
   normalizeFileContents(ldrawDir);
   normalizeFileMap();
   normalizePartsLst();
-  generateAvailablePartsManifest();
 
   if (stats.conflicts > 0) {
     console.warn(`[LDraw Normalize] ${stats.conflicts} conflito(s) de case precisam de revisão manual.`);
@@ -237,8 +214,7 @@ function main() {
     `[LDraw Normalize] Concluído: ${stats.renamed} nome(s) renomeado(s), ` +
       `${stats.merged} duplicata(s) idêntica(s) removida(s), ` +
       `${stats.rewritten} arquivo(s) com referências normalizadas, ` +
-      `${stats.fileMapEntries} entradas no filemap, ` +
-      `${stats.availableParts} peça(s) publicada(s) em parts/.` +
+      `${stats.fileMapEntries} entradas no filemap.` +
       (checkOnly ? ' (modo --check: nenhuma alteração gravada)' : '')
   );
 }

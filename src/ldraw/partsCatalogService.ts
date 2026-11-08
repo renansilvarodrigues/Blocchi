@@ -1,6 +1,7 @@
 import type { LegoPartDefinition, LegoCategory } from '../types/lego';
 export { OFFICIAL_LDRAW_CATEGORIES } from '../types/lego';
 import { LEGO_PARTS_CATALOG } from './partsData';
+import { LDRAW_BASE_PATH } from './ldrawLibrary';
 
 interface MeasuredPartSize {
   studsX: number;
@@ -12,54 +13,6 @@ let cachedCatalog: LegoPartDefinition[] | null = null;
 let catalogPromise: Promise<LegoPartDefinition[]> | null = null;
 const partMap = new Map<string, LegoPartDefinition>();
 const measuredPartSizes = new Map<string, MeasuredPartSize>();
-let availablePartsPromise: Promise<Set<string> | null> | null = null;
-
-function normalizePartId(partId: string): string {
-  return partId.trim().toLowerCase().replace(/\.dat$/i, '');
-}
-
-/**
- * Em produção, o catálogo completo (parts.lst) lista todas as peças oficiais
- * LDraw, mas public/ldraw/parts contém apenas as peças realmente extraídas.
- * O manifesto available-parts.json evita oferecer peças que dariam 404.
- */
-async function loadAvailablePartIds(ldrawBase: string): Promise<Set<string> | null> {
-  if (!import.meta.env.PROD) return null;
-  if (availablePartsPromise) return availablePartsPromise;
-
-  const url = `${ldrawBase}available-parts.json`;
-  availablePartsPromise = fetch(url)
-    .then(async (response) => {
-      if (!response.ok) {
-        console.warn(
-          `[LDraw Catalog] Manifesto de peças não encontrado em "${url}" ` +
-            `(HTTP ${response.status}). O catálogo completo será mantido.`
-        );
-        return null;
-      }
-
-      const raw = await response.json();
-      if (!Array.isArray(raw) || raw.length === 0) return null;
-
-      return new Set(
-        raw.map((id) => normalizePartId(String(id))).filter((id) => id.length > 0)
-      );
-    })
-    .catch((error) => {
-      console.warn(`[LDraw Catalog] Falha ao carregar "${url}".`, error);
-      return null;
-    });
-
-  return availablePartsPromise;
-}
-
-function filterByAvailableParts(
-  parts: LegoPartDefinition[],
-  available: Set<string> | null
-): LegoPartDefinition[] {
-  if (!available) return parts;
-  return parts.filter((part) => available.has(normalizePartId(part.id)));
-}
 
 // Inicializa o mapa com as peças curadas embutidas
 LEGO_PARTS_CATALOG.forEach((part) => partMap.set(part.id.toLowerCase(), part));
@@ -1092,55 +1045,120 @@ export function parsePartsLst(content: string): LegoPartDefinition[] {
 }
 
 /**
+ * Reconstrói o catálogo completo a partir do filemap da biblioteca LDraw.
+ * Usado apenas se `parts.lst` não estiver disponível, para não esconder peças.
+ */
+async function loadCatalogFromFileMap(): Promise<LegoPartDefinition[] | null> {
+  const fileMapUrl = `${LDRAW_BASE_PATH}filemap.json`;
+
+  try {
+    const response = await fetch(fileMapUrl);
+    if (!response.ok) {
+      console.error(
+        `[LDraw Catalog] Falha ao carregar "${fileMapUrl}" ` +
+          `(HTTP ${response.status} ${response.statusText}).`
+      );
+      return null;
+    }
+
+    const raw = (await response.json()) as Record<string, unknown>;
+    if (!raw || typeof raw !== 'object') {
+      console.error(`[LDraw Catalog] Conteúdo inválido em "${fileMapUrl}".`);
+      return null;
+    }
+
+    const ids = new Set<string>();
+    for (const value of Object.values(raw)) {
+      if (typeof value !== 'string') continue;
+
+      const normalized = value.replace(/\\/g, '/').toLowerCase();
+      if (!normalized.startsWith('parts/')) continue;
+      if (normalized.startsWith('parts/s/')) continue;
+      if (normalized.startsWith('parts/textures/')) continue;
+      if (!normalized.endsWith('.dat')) continue;
+
+      const id = normalized.slice('parts/'.length, -'.dat'.length);
+      if (!id || id.includes('/')) continue;
+      ids.add(id);
+    }
+
+    if (ids.size === 0) {
+      console.error(`[LDraw Catalog] Nenhuma peça encontrada em "${fileMapUrl}".`);
+      return null;
+    }
+
+    const parts = Array.from(ids, (id) => getPartDefinitionOrFallback(id));
+    parts.sort(comparePartsByRelevance);
+
+    console.warn(
+      `[LDraw Catalog] parts.lst indisponível; ${parts.length} peças reconstruídas via "${fileMapUrl}".`
+    );
+    return parts;
+  } catch (error) {
+    console.error(`[LDraw Catalog] Erro de rede ao carregar "${fileMapUrl}".`, error);
+    return null;
+  }
+}
+
+/**
  * Carrega a lista completa oficial do catálogo LDraw sob demanda (Lazy Loading)
- * Lê prioritariamente `parts.lst` da biblioteca LDraw.
+ * Lê prioritariamente `parts.lst` da biblioteca LDraw usando sempre o BASE_URL.
  */
 export async function getPartsCatalog(): Promise<LegoPartDefinition[]> {
   if (cachedCatalog) return cachedCatalog;
   if (catalogPromise) return catalogPromise;
 
   catalogPromise = (async () => {
-    const baseUrl = import.meta.env.BASE_URL || '/';
-    const ldrawBase = baseUrl.endsWith('/') ? `${baseUrl}ldraw/` : `${baseUrl}/ldraw/`;
-    const availableParts = await loadAvailablePartIds(ldrawBase);
-
     // 1. Tentar ler o índice oficial parts.lst
+    const partsLstUrl = `${LDRAW_BASE_PATH}parts.lst`;
     try {
-      const partsLstUrl = `${ldrawBase}parts.lst`;
       const response = await fetch(partsLstUrl);
-      if (response.ok) {
+      if (!response.ok) {
+        console.error(
+          `[LDraw Catalog] Falha ao carregar "${partsLstUrl}" ` +
+            `(HTTP ${response.status} ${response.statusText}).`
+        );
+      } else {
         const text = await response.text();
-        if (text && text.length > 50) {
-          const parsed = parsePartsLst(text);
-          const catalogParts = filterByAvailableParts(parsed, availableParts);
+        if (!text || text.length <= 50) {
+          console.error(
+            `[LDraw Catalog] Índice vazio ou inválido em "${partsLstUrl}" (${text.length} bytes).`
+          );
+        } else {
+          const catalogParts = parsePartsLst(text);
           if (catalogParts.length > 0) {
-            if (availableParts && catalogParts.length < parsed.length) {
-              console.warn(
-                `[LDraw Catalog] ${parsed.length - catalogParts.length} peça(s) do parts.lst ` +
-                  'não estão publicadas em public/ldraw/parts e foram ocultadas para evitar 404.'
-              );
-            }
             console.log(
-              `[LDraw Catalog] Carregadas com sucesso ${catalogParts.length} peças oficiais via parts.lst.`
+              `[LDraw Catalog] Carregadas com sucesso ${catalogParts.length} peças oficiais via "${partsLstUrl}".`
             );
             cachedCatalog = catalogParts;
             return catalogParts;
           }
+          console.error(`[LDraw Catalog] "${partsLstUrl}" não produziu peças válidas.`);
         }
       }
-    } catch (err) {
-      console.warn('[LDraw Catalog] Aviso ao buscar parts.lst, tentando fallback JSON:', err);
+    } catch (error) {
+      console.error(`[LDraw Catalog] Erro de rede ao carregar "${partsLstUrl}".`, error);
     }
 
-    // 2. Fallback: tentar ler parts-catalog.json se parts.lst não estiver disponível
+    // 2. Reconstruir o catálogo completo pelo filemap (sem lista restritiva)
+    const fileMapCatalog = await loadCatalogFromFileMap();
+    if (fileMapCatalog) {
+      cachedCatalog = fileMapCatalog;
+      return fileMapCatalog;
+    }
+
+    // 3. Fallback: tentar ler parts-catalog.json
+    const jsonUrl = `${LDRAW_BASE_PATH}parts-catalog.json`;
     try {
-      const jsonUrl = `${ldrawBase}parts-catalog.json`;
       const jsonRes = await fetch(jsonUrl);
-      if (jsonRes.ok) {
+      if (!jsonRes.ok) {
+        console.error(
+          `[LDraw Catalog] Falha ao carregar "${jsonUrl}" ` +
+            `(HTTP ${jsonRes.status} ${jsonRes.statusText}).`
+        );
+      } else {
         const rawJsonData = (await jsonRes.json()) as LegoPartDefinition[];
-        const jsonData = Array.isArray(rawJsonData)
-          ? filterByAvailableParts(rawJsonData, availableParts)
-          : [];
+        const jsonData = Array.isArray(rawJsonData) ? rawJsonData : [];
         if (jsonData.length > 0) {
           const map = new Map<string, LegoPartDefinition>();
           LEGO_PARTS_CATALOG.forEach((p) => map.set(p.id.toLowerCase(), p));
@@ -1155,18 +1173,23 @@ export async function getPartsCatalog(): Promise<LegoPartDefinition[]> {
             }
           });
           const merged = Array.from(map.values()).sort(comparePartsByRelevance);
-          console.log(`[LDraw Catalog] Carregadas ${merged.length} peças via parts-catalog.json.`);
+          console.log(`[LDraw Catalog] Carregadas ${merged.length} peças via "${jsonUrl}".`);
           merged.forEach((p) => partMap.set(p.id.toLowerCase(), p));
           cachedCatalog = merged;
           return merged;
         }
+        console.error(`[LDraw Catalog] "${jsonUrl}" não contém peças.`);
       }
-    } catch (err) {
-      console.warn('[LDraw Catalog] Aviso ao carregar parts-catalog.json:', err);
+    } catch (error) {
+      console.error(`[LDraw Catalog] Erro de rede ao carregar "${jsonUrl}".`, error);
     }
 
-    // 3. Fallback final: usar o catálogo interno estático de alta fidelidade ordenado
-    console.info('[LDraw Catalog] Usando catálogo interno curado.');
+    // 4. Fallback final: catálogo interno, sempre com erro explícito no console
+    console.error(
+      '[LDraw Catalog] Não foi possível carregar nenhum índice remoto ' +
+        `("${partsLstUrl}", "${LDRAW_BASE_PATH}filemap.json" e "${jsonUrl}"). ` +
+        `Usando o catálogo embutido de ${LEGO_PARTS_CATALOG.length} peças.`
+    );
     const sortedDefault = [...LEGO_PARTS_CATALOG].sort(comparePartsByRelevance);
     cachedCatalog = sortedDefault;
     return sortedDefault;

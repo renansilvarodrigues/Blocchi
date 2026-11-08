@@ -8,7 +8,8 @@
     "predev": "node scripts/normalize-ldraw-case.mjs",
     "sync-ldraw": "node scripts/sync-ldraw.mjs",
     "normalize-ldraw": "node scripts/normalize-ldraw-case.mjs",
-    "build": "node scripts/download-ldraw.mjs && node scripts/sync-ldraw.mjs && node scripts/normalize-ldraw-case.mjs && tsc -b && vite build",
+    "extract-full-ldraw": "node scripts/extract-full-ldraw.mjs",
+    "build": "node scripts/download-ldraw.mjs && node scripts/sync-ldraw.mjs && node scripts/normalize-ldraw-case.mjs && tsc -b && vite build && node scripts/extract-full-ldraw.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },
