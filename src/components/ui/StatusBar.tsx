@@ -3,6 +3,7 @@ import { Activity, Layers } from 'lucide-react';
 import type { PlacedBrick } from '../../types/lego';
 import { LEGO_PARTS_CATALOG } from '../../ldraw/partsData';
 import { getLDrawColor } from '../../ldraw/colors';
+import { APP_VERSION } from '../../version';
 
 interface StatusBarProps {
   stats: { count: number; vertices: number; triangles: number };
@@ -90,6 +91,8 @@ export const StatusBar: React.FC<StatusBarProps> = ({
 
       {/* Lado Direito: Estatísticas da Cena */}
       <div className="flex items-center gap-3 font-mono text-[10px] text-zinc-400">
+        <span className="text-zinc-500">Blocchi v{APP_VERSION}</span>
+        <span className="text-zinc-700">|</span>
         <div className="flex items-center gap-1">
           <span className="text-zinc-500">Peças:</span>
           <span className="text-zinc-200 font-semibold">{stats.count}</span>

@@ -6,6 +6,7 @@ import {
   Undo2,
   Redo2,
 } from 'lucide-react';
+import { APP_VERSION } from '../../version';
 
 interface TopNavBarProps {
   onExportLDraw: () => void;
@@ -59,6 +60,9 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             BLOCCHI
             <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1 py-0.2 rounded font-mono font-normal">
               LDraw 3D
+            </span>
+            <span className="text-[10px] bg-zinc-700/40 text-zinc-300 border border-zinc-600/60 px-1 py-0.2 rounded font-mono font-normal">
+              v{APP_VERSION}
             </span>
           </span>
         </div>

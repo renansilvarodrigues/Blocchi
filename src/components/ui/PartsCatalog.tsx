@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Box, ChevronDown, MousePointerClick, Sparkles, Database } from 'lucide-react';
+import { Search, Plus, ChevronDown, MousePointerClick, Database } from 'lucide-react';
 import { getPartsCatalog, comparePartsByRelevance } from '../../ldraw/partsCatalogService';
 import { LEGO_PARTS_CATALOG } from '../../ldraw/partsData';
+import { PartThumbnail } from './PartThumbnail';
 import type { LegoPartDefinition } from '../../types/lego';
 
 interface PartsCatalogProps {
@@ -232,16 +233,17 @@ export const PartsCatalog: React.FC<PartsCatalogProps> = ({
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2.5">
-                  {/* Prévia da peça com a cor ativa */}
-                  <div
-                    className="w-8 h-8 rounded border border-white/20 flex items-center justify-center shadow-inner shrink-0"
-                    style={{ backgroundColor: activeColorHex }}
-                  >
-                    {part.isFlexible ? (
-                      <Sparkles size={16} className="text-amber-300 drop-shadow animate-pulse" />
-                    ) : (
-                      <Box size={16} className="text-white drop-shadow" />
-                    )}
+                  <div className="relative w-11 h-11 shrink-0">
+                    <PartThumbnail
+                      partId={part.id}
+                      partName={part.name}
+                      className="w-full h-full"
+                    />
+                    <span
+                      className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white/50 shadow"
+                      style={{ backgroundColor: activeColorHex }}
+                      title="Cor ativa para posicionamento"
+                    />
                   </div>
                   <div>
                     <h4 className="font-semibold text-zinc-200 text-xs flex items-center gap-1.5 line-clamp-1">
