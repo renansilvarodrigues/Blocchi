@@ -8,29 +8,33 @@ import {
 interface PartThumbnailProps {
   partId: string;
   partName: string;
+  activeColorCode: number;
   className?: string;
 }
 
 export const PartThumbnail: React.FC<PartThumbnailProps> = ({
   partId,
   partName,
+  activeColorCode,
   className = 'w-11 h-11',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(
     () => typeof IntersectionObserver === 'undefined'
   );
+  const requestKey = `${activeColorCode}:${partId}`;
   const [state, setState] = useState(() => ({
-    partId,
-    thumbnail: getCachedPartThumbnail(partId) ?? null,
+    key: requestKey,
+    thumbnail: getCachedPartThumbnail(partId, activeColorCode) ?? null,
     failed: false,
   }));
 
-  const isCurrentPart = state.partId === partId;
-  const thumbnail = isCurrentPart
+  const isCurrentRequest = state.key === requestKey;
+  const cachedThumbnail = getCachedPartThumbnail(partId, activeColorCode);
+  const thumbnail = isCurrentRequest
     ? state.thumbnail
-    : getCachedPartThumbnail(partId) ?? null;
-  const hasFailed = isCurrentPart ? state.failed : false;
+    : cachedThumbnail ?? null;
+  const hasFailed = isCurrentRequest ? state.failed : false;
 
   useEffect(() => {
     if (isVisible) return;
@@ -53,28 +57,22 @@ export const PartThumbnail: React.FC<PartThumbnailProps> = ({
   }, [isVisible]);
 
   useEffect(() => {
-    if (!isVisible || thumbnail || hasFailed) return;
+    if (!isVisible || hasFailed) return;
+
+    const cached = getCachedPartThumbnail(partId, activeColorCode);
+    if (cached || thumbnail) return;
 
     let isActive = true;
 
-    requestPartThumbnail(partId).then((dataUrl) => {
+    requestPartThumbnail(partId, activeColorCode).then((dataUrl) => {
       if (!isActive) return;
-      setState((prev) => {
-        if (prev.partId !== partId) {
-          return { partId, thumbnail: dataUrl, failed: !dataUrl };
-        }
-        return {
-          ...prev,
-          thumbnail: dataUrl,
-          failed: !dataUrl,
-        };
-      });
+      setState({ key: requestKey, thumbnail: dataUrl, failed: !dataUrl });
     });
 
     return () => {
       isActive = false;
     };
-  }, [isVisible, thumbnail, hasFailed, partId]);
+  }, [isVisible, thumbnail, hasFailed, partId, activeColorCode, requestKey]);
 
   return (
     <div

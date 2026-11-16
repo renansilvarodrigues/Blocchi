@@ -18,11 +18,13 @@ import {
   applyTexmapUVs,
   attachLDrawFileMap,
   configureLDrawLoader,
+  enableTexmapAlphaCompositing,
   getLDrawAssetUrl,
   getTexmapRecordByCode,
   installPreloadedFiles,
   preloadLDrawPart,
   registerTexmapMaterials,
+  resolveTexmapBaseColor,
 } from './ldrawLibrary';
 
 let cachedLoader: LDrawLoader | null = null;
@@ -154,10 +156,15 @@ async function getReadyLDrawLoader(): Promise<LDrawLoader> {
   return loaderReadyPromise;
 }
 
+const MAIN_COLOUR_CODE = '16';
+const MAIN_EDGE_COLOUR_CODE = '24';
+
+function isMainColourCode(code: string): boolean {
+  return code === MAIN_COLOUR_CODE || code === MAIN_EDGE_COLOUR_CODE;
+}
+
 function resolveColorCode(code: string, defaultColorCode: number): number {
-  if (code === '16' || code === '24' || code === '' || code === '-1') {
-    return defaultColorCode;
-  }
+  if (isMainColourCode(code)) return defaultColorCode;
 
   const numeric = Number(code);
   if (!Number.isFinite(numeric)) return defaultColorCode;
@@ -194,43 +201,14 @@ function createSolidABSColorMaterial(
     side: THREE.DoubleSide,
   });
   material.name = `ABS ${ldrawColor.name}`;
-  material.userData = { code: String(resolvedCode) };
+  material.userData = {
+    code: String(resolvedCode),
+    sourceColorCode: code,
+    isMainColor: isMainColourCode(code),
+  };
 
   absMaterialCache.set(cacheKey, material);
   return material;
-}
-
-/**
- * Compõe a textura TEXMAP sobre a cor da peça usando o canal alpha.
- *
- * O padrão LDraw permite que o PNG tenha transparência "deixando a cor da
- * peça aparecer". Um `map` convencional multiplicaria a estampa pela cor
- * (amarelo × vermelho = vermelho) e um `alphaTest` descartaria os pixels
- * transparentes, deixando buracos na peça. O mix abaixo reproduz o
- * comportamento correto: opaco = cor exata da textura; transparente = cor
- * da peça.
- */
-function enableTexmapAlphaCompositing(material: THREE.Material): void {
-  if (material.userData.texmapComposite) return;
-  material.userData.texmapComposite = true;
-
-  material.onBeforeCompile = (shader) => {
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <map_fragment>',
-      `
-#ifdef USE_MAP
-	vec4 sampledDiffuseColor = texture2D( map, vMapUv );
-
-	#ifdef DECODE_VIDEO_TEXTURE
-		sampledDiffuseColor = sRGBTransferEOTF( sampledDiffuseColor );
-	#endif
-
-	diffuseColor.rgb = mix( diffuseColor.rgb, sampledDiffuseColor.rgb, sampledDiffuseColor.a );
-#endif
-`
-    );
-  };
-  material.customProgramCacheKey = () => 'ldraw_texmap_alpha_composite';
 }
 
 function createTexmapABSColorMaterial(
@@ -241,11 +219,12 @@ function createTexmapABSColorMaterial(
   const record = getTexmapRecordByCode(texmapCode);
   if (!record) return null;
 
-  const cacheKey = `texmap_${texmapCode}_${defaultColorCode}_${wireframe}`;
+  const baseColor = resolveTexmapBaseColor(record, defaultColorCode);
+  const cacheKey = `texmap_${texmapCode}_${baseColor.colorCode}_${wireframe}`;
   const cached = absMaterialCache.get(cacheKey);
   if (cached) return cached;
 
-  const ldrawColor = getLDrawColor(defaultColorCode);
+  const ldrawColor = getLDrawColor(baseColor.colorCode);
   const isTransparent = ldrawColor.isTrans || ldrawColor.category === 'transparent';
 
   const material = new THREE.MeshPhysicalMaterial({
@@ -263,6 +242,9 @@ function createTexmapABSColorMaterial(
     opacity: isTransparent ? 0.75 : 1.0,
     transparent: isTransparent,
     depthWrite: !isTransparent,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
     wireframe,
     side: THREE.DoubleSide,
   });
@@ -270,6 +252,8 @@ function createTexmapABSColorMaterial(
   material.name = `ABS TEXMAP ${record.imageName}`;
   material.userData = {
     code: texmapCode,
+    sourceColorCode: record.sourceColorCode,
+    isMainColor: baseColor.isMainColor,
     texmapCode,
     texmapImage: record.imagePath,
   };
@@ -284,6 +268,16 @@ function resolveABSMaterial(
   wireframe: boolean
 ): THREE.Material {
   if (typeof entry !== 'string') {
+    const texmapCode = entry.userData?.texmapCode;
+    if (texmapCode) {
+      const texmapMaterial = createTexmapABSColorMaterial(
+        String(texmapCode),
+        defaultColorCode,
+        wireframe
+      );
+      if (texmapMaterial) return texmapMaterial;
+    }
+
     // Materiais já resolvidos com mapa (ex.: texturas de fluxos legados)
     // são preservados para não perder a estampa.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -544,13 +538,30 @@ function cloneTexmapMaterialForColor(
   colorCode: number
 ): THREE.Material {
   const texmapCode = material.userData?.texmapCode as string | undefined;
-  const cacheKey = `${texmapCode}_${colorCode}`;
+  const sourceColorCode = material.userData?.sourceColorCode as string | undefined;
+  const sourceIsMainColor =
+    sourceColorCode === undefined ||
+    sourceColorCode === MAIN_COLOUR_CODE ||
+    sourceColorCode === MAIN_EDGE_COLOUR_CODE;
+  const parsedSourceColor = Number(sourceColorCode);
+  const baseColorCode =
+    sourceIsMainColor || !Number.isFinite(parsedSourceColor)
+      ? colorCode
+      : parsedSourceColor;
+
+  // Alguns fluxos preservam o mapa sem o código TEXMAP no userData. Nesse
+  // caso a chave inclui a identidade do material/mapa para não compartilhar
+  // a estampa errada entre peças diferentes.
+  const mapUuid = (material as THREE.MeshStandardMaterial).map?.uuid ?? 'nomap';
+  const cacheKey = texmapCode
+    ? `${texmapCode}_${baseColorCode}`
+    : `${material.uuid}_${mapUuid}_${baseColorCode}`;
 
   const cached = texmapColorMaterialCache.get(cacheKey);
   if (cached) return cached;
 
   const clone = material.clone();
-  const ldrawColor = getLDrawColor(colorCode);
+  const ldrawColor = getLDrawColor(baseColorCode);
   const isTransparent = ldrawColor.isTrans || ldrawColor.category === 'transparent';
 
   if ('color' in clone && clone.color instanceof THREE.Color) {
@@ -561,6 +572,9 @@ function cloneTexmapMaterialForColor(
   clone.alphaTest = 0;
   clone.depthWrite = !isTransparent;
   clone.opacity = isTransparent ? 0.75 : 1.0;
+  clone.polygonOffset = true;
+  clone.polygonOffsetFactor = -1;
+  clone.polygonOffsetUnits = -1;
   clone.userData = { ...material.userData, texmapComposite: false };
   enableTexmapAlphaCompositing(clone);
   clone.needsUpdate = true;
@@ -604,7 +618,10 @@ export function applyLDrawNativeMaterials(
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       const resolved = materials.map((material) => {
         if (!material) return material;
-        if (material.userData?.texmapCode) {
+        const hasTextureMap = Boolean(
+          (material as THREE.MeshStandardMaterial).map
+        );
+        if (material.userData?.texmapCode || hasTextureMap) {
           return cloneTexmapMaterialForColor(material, colorCode);
         }
         return material;
@@ -626,6 +643,19 @@ export function applyLDrawNativeMaterials(
   });
 
   applyTexmapUVs(group);
+}
+
+export function applyLDrawMaterialColorPolicy(
+  group: THREE.Group,
+  colorCode: number,
+  engineMode: 'procedural' | 'ldraw',
+  wireframe: boolean = false
+): void {
+  if (engineMode === 'procedural') {
+    applyABSStudioMaterials(group, colorCode, wireframe);
+  } else {
+    applyLDrawNativeMaterials(group, colorCode, wireframe);
+  }
 }
 
 interface MeasuredDimensions {
@@ -785,11 +815,7 @@ export async function loadUnifiedBrick(
   try {
     const rawGroup = await fetchRawLDrawGeometry(cleanId);
 
-    if (engineMode === 'procedural') {
-      applyABSStudioMaterials(rawGroup, colorCode, wireframe);
-    } else {
-      applyLDrawNativeMaterials(rawGroup, colorCode, wireframe);
-    }
+    applyLDrawMaterialColorPolicy(rawGroup, colorCode, engineMode, wireframe);
 
     const finalized = finalizeLoadedGroup(
       rawGroup,

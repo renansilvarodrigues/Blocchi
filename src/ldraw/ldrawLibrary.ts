@@ -22,6 +22,7 @@ export interface LDrawTexmapRecord {
   p1: THREE.Vector3;
   p2: THREE.Vector3;
   p3: THREE.Vector3;
+  sourceColorCode: string;
 }
 
 export interface LDrawPreloadResult {
@@ -271,6 +272,50 @@ export function resolveLDrawPath(name: string, fromPath?: string): string | null
   return fallback ? normalizePath(fallback) : null;
 }
 
+/**
+ * Resolve o arquivo de imagem de uma diretiva !TEXMAP.
+ *
+ * As texturas oficiais ficam em `parts/textures/`, mas as diretivas costumam
+ * referenciar apenas o nome base (ex.: `3626cpx0a.png`). A resolução tenta,
+ * nesta ordem:
+ * 1. caminho relativo ao arquivo .dat que contém a diretiva;
+ * 2. caminho oficial exato no filemap;
+ * 3. pastas de assets conhecidas (`parts/textures/`, `textures/`, `parts/`);
+ * 4. nome base em qualquer pasta indexada.
+ */
+export function resolveLDrawTexturePath(
+  imageName: string,
+  fromPath?: string
+): string | null {
+  const normalized = normalizePath(imageName);
+  if (!normalized) return null;
+
+  const base = normalized.split('/').pop() || normalized;
+  const candidates: string[] = [];
+
+  if (fromPath) {
+    const normalizedFrom = normalizePath(fromPath);
+    const slash = normalizedFrom.lastIndexOf('/');
+    if (slash > 0) {
+      candidates.push(`${normalizedFrom.slice(0, slash)}/${normalized}`);
+    }
+  }
+
+  candidates.push(normalized);
+
+  for (const prefix of ['parts/textures/', 'textures/', 'parts/', '']) {
+    const candidate = `${prefix}${base}`;
+    if (!candidates.includes(candidate)) candidates.push(candidate);
+  }
+
+  for (const candidate of candidates) {
+    const mapped = normalizedFileMap[candidate];
+    if (mapped) return normalizePath(mapped);
+  }
+
+  return resolveLDrawPath(imageName, fromPath);
+}
+
 export function getLDrawAssetUrl(canonicalPath: string): string {
   return `${LDRAW_BASE_PATH}${normalizePath(canonicalPath)}`;
 }
@@ -304,32 +349,56 @@ const TEXMAP_END_REGEX = /^0\s+!TEXMAP\s+END/i;
 const ACTIVE_TEXMAP_LINE_REGEX = /^0\s+!:\s*(.*)$/;
 const GEOMETRY_LINE_REGEX = /^\s*[1-5]\s+/;
 
-async function loadTexture(imagePath: string): Promise<THREE.Texture | null> {
-  const cached = textureCache.get(imagePath);
-  if (cached) return cached;
-  if (unavailableTextures.has(imagePath)) return null;
+function buildTextureAssetCandidates(canonicalPath: string): string[] {
+  const normalized = normalizePath(canonicalPath);
+  const base = normalized.split('/').pop() || normalized;
+  const candidates = [normalized];
 
-  const url = getLDrawAssetUrl(imagePath);
-  try {
-    // TextureLoader usa o cache HTTP do navegador; também valida a existência
-    // do arquivo antes de qualquer geometria texturizada ser aceita.
-    const texture = await new THREE.TextureLoader().loadAsync(url);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.wrapS = THREE.ClampToEdgeWrapping;
-    texture.wrapT = THREE.ClampToEdgeWrapping;
-    texture.anisotropy = 8;
-    texture.needsUpdate = true;
-    textureCache.set(imagePath, texture);
-    return texture;
-  } catch (error) {
-    unavailableTextures.add(imagePath);
-    console.warn(
-      `[LDraw] Textura "${imagePath}" não pôde ser carregada em "${url}". ` +
-        'A geometria fallback (sem estampa) será usada para este bloco TEXMAP.',
-      error
-    );
-    return null;
+  for (const prefix of ['parts/textures/', 'textures/', 'parts/', '']) {
+    const candidate = `${prefix}${base}`;
+    if (!candidates.includes(candidate)) candidates.push(candidate);
   }
+
+  return candidates;
+}
+
+async function loadTexture(imagePath: string): Promise<THREE.Texture | null> {
+  const normalizedPath = normalizePath(imagePath);
+  const cached = textureCache.get(normalizedPath);
+  if (cached) return cached;
+  if (unavailableTextures.has(normalizedPath)) return null;
+
+  const attemptedUrls: string[] = [];
+  let lastError: unknown = null;
+
+  for (const candidate of buildTextureAssetCandidates(normalizedPath)) {
+    const url = getLDrawAssetUrl(candidate);
+    attemptedUrls.push(url);
+
+    try {
+      // TextureLoader usa o cache HTTP do navegador; também valida a existência
+      // do arquivo antes de qualquer geometria texturizada ser aceita.
+      const texture = await new THREE.TextureLoader().loadAsync(url);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.ClampToEdgeWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      texture.anisotropy = 8;
+      texture.needsUpdate = true;
+      textureCache.set(normalizedPath, texture);
+      return texture;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  unavailableTextures.add(normalizedPath);
+  console.warn(
+    `[LDraw] Textura "${normalizedPath}" não pôde ser carregada. ` +
+      `Tentativas: ${attemptedUrls.join(', ')}. ` +
+      'A geometria fallback (sem estampa) será usada para este bloco TEXMAP.',
+    lastError
+  );
+  return null;
 }
 
 async function getOrCreateTexmapRecord(
@@ -356,6 +425,7 @@ async function getOrCreateTexmapRecord(
     p1,
     p2,
     p3,
+    sourceColorCode: '16',
   };
 
   texmapRecordsByKey.set(key, record);
@@ -398,7 +468,7 @@ async function processTexmapDirectives(
     const startMatch = trimmed.match(TEXMAP_START_REGEX);
     if (startMatch) {
       const imageName = startMatch[10];
-      const imagePath = resolveLDrawPath(imageName, canonicalPath);
+      const imagePath = resolveLDrawTexturePath(imageName, canonicalPath);
 
       if (!imagePath) {
         console.warn(
@@ -453,6 +523,10 @@ async function processTexmapDirectives(
     if (activeRecord) {
       const activeMatch = line.match(ACTIVE_TEXMAP_LINE_REGEX);
       if (activeMatch && activeMatch[1]) {
+        const sourceMatch = activeMatch[1].match(/^\s*[1-5]\s+(\S+)/);
+        if (sourceMatch) {
+          activeRecord.sourceColorCode = sourceMatch[1];
+        }
         const activeLine = replaceColorCode(activeMatch[1], activeRecord.code);
         result.push(activeLine);
         continue;
@@ -687,6 +761,52 @@ export function getTexmapRecordByCode(code: string): LDrawTexmapRecord | undefin
   return texmapRecordsByCode.get(code);
 }
 
+export function resolveTexmapBaseColor(
+  record: LDrawTexmapRecord,
+  mainColorCode: number
+): { colorCode: number; isMainColor: boolean } {
+  const source = record.sourceColorCode;
+  const isMainColor = source === '16' || source === '24';
+  const parsed = Number(source);
+
+  return {
+    colorCode:
+      isMainColor || !Number.isFinite(parsed) ? mainColorCode : parsed,
+    isMainColor,
+  };
+}
+
+/**
+ * Compõe a textura TEXMAP sobre a cor da peça usando o canal alpha.
+ *
+ * Pixels opacos mantêm a cor exata da estampa; pixels transparentes revelam
+ * o plástico na cor selecionada. Um `map` convencional multiplicaria a
+ * estampa pela cor da peça e um `alphaTest` descartaria os pixels
+ * transparentes, abrindo buracos ou mascarando o print.
+ */
+export function enableTexmapAlphaCompositing(material: THREE.Material): void {
+  if (material.userData.texmapComposite) return;
+  material.userData.texmapComposite = true;
+
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <map_fragment>',
+      `
+#ifdef USE_MAP
+	vec4 sampledDiffuseColor = texture2D( map, vMapUv );
+
+	#ifdef DECODE_VIDEO_TEXTURE
+		sampledDiffuseColor = sRGBTransferEOTF( sampledDiffuseColor );
+	#endif
+
+	diffuseColor.rgb = mix( diffuseColor.rgb, sampledDiffuseColor.rgb, sampledDiffuseColor.a );
+#endif
+`
+    );
+  };
+  material.customProgramCacheKey = () => 'ldraw_texmap_alpha_composite';
+}
+
 /**
  * Registra materiais sentinela para que o material pass do LDrawLoader
  * resolva os códigos de textura em vez de usar o material "missing".
@@ -709,14 +829,22 @@ export function registerTexmapMaterials(
       roughness: 0.35,
       metalness: 0.02,
       transparent: true,
-      alphaTest: 0.01,
+      alphaTest: 0,
+      depthWrite: true,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
       side: THREE.DoubleSide,
     });
     material.userData = {
       code: record.code,
+      sourceColorCode: record.sourceColorCode,
+      isMainColor:
+        record.sourceColorCode === '16' || record.sourceColorCode === '24',
       texmapCode: record.code,
       texmapImage: record.imagePath,
     };
+    enableTexmapAlphaCompositing(material);
 
     const edgeMaterial = new THREE.LineBasicMaterial({
       color: new THREE.Color(0x111111),

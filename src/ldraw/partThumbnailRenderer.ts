@@ -3,8 +3,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { loadUnifiedBrick } from './ldrawLoaderHelper';
 
 const THUMBNAIL_SIZE = 160;
-const THUMBNAIL_NEUTRAL_COLOR_CODE = 151;
 const MAX_CONCURRENT_JOBS = 3;
+const MAX_CACHE_ENTRIES = 600;
 
 const CAMERA_DIRECTION = new THREE.Vector3(1, 0.82, 1.18).normalize();
 const CAMERA_MARGIN = 1.08;
@@ -13,6 +13,8 @@ export const partThumbnailCache = new Map<string, string>();
 
 interface ThumbnailJob {
   key: string;
+  partId: string;
+  colorCode: number;
   resolve: (dataUrl: string | null) => void;
 }
 
@@ -21,7 +23,6 @@ interface ThumbnailContext {
   scene: THREE.Scene;
   camera: THREE.OrthographicCamera;
   modelHolder: THREE.Group;
-  neutralMaterial: THREE.MeshPhysicalMaterial;
   outlineMaterial: THREE.LineBasicMaterial;
 }
 
@@ -34,6 +35,10 @@ let activeJobs = 0;
 
 function normalizePartId(partId: string): string {
   return partId.trim().replace(/\.dat$/i, '').toLowerCase();
+}
+
+function thumbnailKey(partId: string, colorCode: number): string {
+  return `${colorCode}:${normalizePartId(partId)}`;
 }
 
 function createThumbnailContext(): ThumbnailContext | null {
@@ -82,17 +87,6 @@ function createThumbnailContext(): ThumbnailContext | null {
     modelHolder.name = 'ThumbnailModelHolder';
     scene.add(modelHolder);
 
-    const neutralMaterial = new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color('#d7dbe0'),
-      roughness: 0.55,
-      metalness: 0.02,
-      clearcoat: 0.12,
-      clearcoatRoughness: 0.35,
-      envMapIntensity: 0.7,
-      side: THREE.DoubleSide,
-    });
-    neutralMaterial.name = 'ThumbnailNeutralABS';
-
     const outlineMaterial = new THREE.LineBasicMaterial({
       color: new THREE.Color('#5a6068'),
       transparent: true,
@@ -109,7 +103,6 @@ function createThumbnailContext(): ThumbnailContext | null {
       scene,
       camera,
       modelHolder,
-      neutralMaterial,
       outlineMaterial,
     };
     return context;
@@ -121,10 +114,11 @@ function createThumbnailContext(): ThumbnailContext | null {
 }
 
 function applyThumbnailMaterials(group: THREE.Group, ctx: ThumbnailContext): void {
+  // Os materiais já chegam prontos de loadUnifiedBrick, que aplica a cor
+  // dinâmica somente à Cor 16 e preserva cores fixas e mapas TEXMAP.
   group.traverse((child) => {
     if ((child as THREE.Mesh).isMesh) {
       const mesh = child as THREE.Mesh;
-      mesh.material = ctx.neutralMaterial;
       mesh.castShadow = false;
       mesh.receiveShadow = false;
     } else if ((child as THREE.LineSegments).isLineSegments && child.visible) {
@@ -194,7 +188,10 @@ function yieldToMainThread(): Promise<void> {
   });
 }
 
-async function renderPartThumbnail(key: string): Promise<string | null> {
+async function renderPartThumbnail(
+  partId: string,
+  colorCode: number
+): Promise<string | null> {
   const ctx = createThumbnailContext();
   if (!ctx) return null;
 
@@ -202,12 +199,7 @@ async function renderPartThumbnail(key: string): Promise<string | null> {
 
   let group: THREE.Group | null = null;
   try {
-    group = await loadUnifiedBrick(
-      key,
-      THUMBNAIL_NEUTRAL_COLOR_CODE,
-      'procedural',
-      false
-    );
+    group = await loadUnifiedBrick(partId, colorCode, 'procedural', false);
 
     applyThumbnailMaterials(group, ctx);
     ctx.modelHolder.add(group);
@@ -235,9 +227,16 @@ function pumpQueue(): void {
 
     activeJobs += 1;
 
-    void renderPartThumbnail(job.key)
+    void renderPartThumbnail(job.partId, job.colorCode)
       .then((dataUrl) => {
-        if (dataUrl) partThumbnailCache.set(job.key, dataUrl);
+        if (dataUrl) {
+          partThumbnailCache.set(job.key, dataUrl);
+          while (partThumbnailCache.size > MAX_CACHE_ENTRIES) {
+            const oldestKey = partThumbnailCache.keys().next().value;
+            if (oldestKey === undefined) break;
+            partThumbnailCache.delete(oldestKey);
+          }
+        }
         job.resolve(dataUrl);
       })
       .catch(() => {
@@ -250,13 +249,19 @@ function pumpQueue(): void {
   }
 }
 
-export function getCachedPartThumbnail(partId: string): string | undefined {
-  return partThumbnailCache.get(normalizePartId(partId));
+export function getCachedPartThumbnail(
+  partId: string,
+  colorCode: number
+): string | undefined {
+  return partThumbnailCache.get(thumbnailKey(partId, colorCode));
 }
 
-export function requestPartThumbnail(partId: string): Promise<string | null> {
-  const key = normalizePartId(partId);
-  if (!key) return Promise.resolve(null);
+export function requestPartThumbnail(
+  partId: string,
+  colorCode: number
+): Promise<string | null> {
+  const key = thumbnailKey(partId, colorCode);
+  if (!normalizePartId(partId)) return Promise.resolve(null);
 
   const cached = partThumbnailCache.get(key);
   if (cached) return Promise.resolve(cached);
@@ -265,7 +270,7 @@ export function requestPartThumbnail(partId: string): Promise<string | null> {
   if (pending) return pending;
 
   const promise = new Promise<string | null>((resolve) => {
-    jobQueue.push({ key, resolve });
+    jobQueue.push({ key, partId, colorCode, resolve });
   });
 
   pendingThumbnails.set(key, promise);

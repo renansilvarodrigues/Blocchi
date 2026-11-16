@@ -7,6 +7,7 @@ import type { LegoPartDefinition } from '../../types/lego';
 
 interface PartsCatalogProps {
   onAddPart: (part: LegoPartDefinition) => void;
+  activeColorCode: number;
   activeColorHex: string;
   placingPartId?: string | null;
 }
@@ -84,6 +85,7 @@ const CATEGORIES_LIST: Array<{ key: string; label: string; icon: string }> = [
 
 export const PartsCatalog: React.FC<PartsCatalogProps> = ({
   onAddPart,
+  activeColorCode,
   activeColorHex,
   placingPartId = null,
 }) => {
@@ -237,6 +239,7 @@ export const PartsCatalog: React.FC<PartsCatalogProps> = ({
                     <PartThumbnail
                       partId={part.id}
                       partName={part.name}
+                      activeColorCode={activeColorCode}
                       className="w-full h-full"
                     />
                     <span

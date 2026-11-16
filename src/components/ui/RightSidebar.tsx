@@ -146,6 +146,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         {activeTab === 'parts' && (
           <PartsCatalog
             onAddPart={onAddPart}
+            activeColorCode={activeColorCode}
             activeColorHex={activeColorHex}
             placingPartId={placingPartId}
           />
